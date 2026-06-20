@@ -8,14 +8,37 @@ import (
 	"os"
 	"time"
 
+	"github.com/joho/godotenv"
+
+	"github.com/agentrix/backend/internal/auth"
 	"github.com/agentrix/backend/internal/engine"
 	"github.com/agentrix/backend/internal/graph"
+	"github.com/agentrix/backend/internal/registry"
 	"github.com/agentrix/backend/internal/simulator"
+	"github.com/agentrix/backend/internal/userapi"
 )
 
 func main() {
 	simSpeed := flag.Float64("sim-speed", 1.0, "simulator speed multiplier (0=disable)")
 	flag.Parse()
+
+	godotenv.Load()
+
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		dsn = "postgresql://postgres.fktowpepipmyrlxkvuez:Cy1jmvuviHJkrhAL@aws-1-ap-south-1.pooler.supabase.com:6543/postgres"
+	}
+
+	db, err := auth.OpenDB(dsn)
+	if err != nil {
+		log.Fatalf("database: %v", err)
+	}
+	defer db.Close()
+
+	if err := auth.MigrateDB(db); err != nil {
+		log.Fatalf("migrate: %v", err)
+	}
+	auth.StartSessionCleanup(db)
 
 	g := graph.NewDefaultGraph()
 	eng := engine.New(g)
@@ -28,7 +51,26 @@ func main() {
 		sim.RunAsync(*simSpeed)
 	}
 
+	authStore := auth.NewStore(db)
+	authServer := auth.NewServer(authStore)
+	userAPIServer := userapi.NewServer(authStore, eng, g)
+
+	vehRegistry := registry.NewStore()
+	authServer.WithVehicleRegistrar(vehRegistry)
+	userAPIServer.WithRegistry(vehRegistry)
+
+	mux := http.NewServeMux()
+
+	mux.Handle("/api/v1/auth/signup", cors(http.HandlerFunc(authServer.HandleSignup)))
+	mux.Handle("/api/v1/auth/login", cors(http.HandlerFunc(authServer.HandleLogin)))
+	mux.Handle("/api/v1/auth/me", cors(http.HandlerFunc(authServer.HandleMe)))
+
 	srv := engine.NewServer(eng)
+	srv.RegisterRoutesOn(mux)
+
+	userAPIServer.RegisterHandlers(mux)
+
+	wrapped := authMiddleware(authStore, mux)
 
 	summary := g.Summarize()
 	fmt.Printf("╔══════════════════════════════════════════════╗\n")
@@ -39,7 +81,7 @@ func main() {
 	fmt.Printf("  Distance:  %.1f km\n", summary["total_distance_m"].(float64)/1000)
 	fmt.Printf("  Listening: :%s\n", getPort())
 
-	log.Fatal(http.ListenAndServe(":"+getPort(), withLogging(srv)))
+	log.Fatal(http.ListenAndServe(":"+getPort(), withLogging(wrapped)))
 }
 
 func getPort() string {
@@ -66,4 +108,58 @@ type loggingResponseWriter struct {
 func (lrw *loggingResponseWriter) WriteHeader(code int) {
 	lrw.status = code
 	lrw.ResponseWriter.WriteHeader(code)
+}
+
+func cors(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func authMiddleware(store *auth.Store, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		if needsAuth(r.URL.Path) {
+			auth.Middleware(store, next).ServeHTTP(w, r)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func needsAuth(path string) bool {
+	unauthed := []string{
+		"/api/v1/auth/signup",
+		"/api/v1/auth/login",
+		"/api/v1/telemetry",
+		"/api/v1/routes",
+		"/api/v1/eta",
+		"/api/v1/headway",
+		"/api/v1/status",
+		"/api/v1/vehicles/nearby",
+	}
+	for _, u := range unauthed {
+		if path == u || stringsHasPrefix(path, u+"/") {
+			return false
+		}
+	}
+	return true
+}
+
+func stringsHasPrefix(s, prefix string) bool {
+	return len(s) >= len(prefix) && s[:len(prefix)] == prefix
 }
