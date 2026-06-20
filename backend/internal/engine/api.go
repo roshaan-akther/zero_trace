@@ -28,13 +28,17 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) registerRoutes() {
-	s.mux.HandleFunc("/api/v1/telemetry", s.handleTelemetry)
-	s.mux.HandleFunc("/api/v1/eta", s.handleETA)
-	s.mux.HandleFunc("/api/v1/eta/journey", s.handleJourney)
-	s.mux.HandleFunc("/api/v1/headway", s.handleHeadway)
-	s.mux.HandleFunc("/api/v1/routes", s.handleRoutes)
-	s.mux.HandleFunc("/api/v1/routes/", s.handleRouteDetail)
-	s.mux.HandleFunc("/api/v1/status", s.handleStatus)
+	s.RegisterRoutesOn(s.mux)
+}
+
+func (s *Server) RegisterRoutesOn(mux *http.ServeMux) {
+	mux.HandleFunc("/api/v1/telemetry", s.handleTelemetry)
+	mux.HandleFunc("/api/v1/eta", s.handleETA)
+	mux.HandleFunc("/api/v1/eta/journey", s.handleJourney)
+	mux.HandleFunc("/api/v1/headway", s.handleHeadway)
+	mux.HandleFunc("/api/v1/routes", s.handleRoutes)
+	mux.HandleFunc("/api/v1/routes/", s.handleRouteDetail)
+	mux.HandleFunc("/api/v1/status", s.handleStatus)
 }
 
 func (s *Server) handleTelemetry(w http.ResponseWriter, r *http.Request) {
