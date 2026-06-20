@@ -90,7 +90,7 @@ func (g *RouteGraph) StopCount() int {
 	return len(g.StopsByID)
 }
 
-func haversine(a, b LatLng) float64 {
+func Haversine(a, b LatLng) float64 {
 	const R = 6371000.0
 	dLat := (b.Lat - a.Lat) * math.Pi / 180
 	dLng := (b.Lng - a.Lng) * math.Pi / 180
@@ -109,7 +109,7 @@ func precomputePolylineDistances(r *Route) {
 	pts := make([]float64, len(r.Polyline))
 	pts[0] = 0
 	for i := 1; i < len(r.Polyline); i++ {
-		d := haversine(r.Polyline[i-1], r.Polyline[i])
+		d := Haversine(r.Polyline[i-1], r.Polyline[i])
 		r.TotalLengthM += d
 		pts[i] = r.TotalLengthM
 	}
@@ -125,32 +125,11 @@ func precomputeStopDistances(r *Route) {
 }
 
 func projectStopOntoPolyline(s *Stop, polyline []LatLng) float64 {
-	stopLL := LatLng{s.Lat, s.Lng}
-	minDist := math.MaxFloat64
-	bestDistAlong := 0.0
-	cumulative := 0.0
-
-	for i := 1; i < len(polyline); i++ {
-		d := haversine(polyline[i-1], polyline[i])
-		projected := projectPointOntoSegment(polyline[i-1], polyline[i], stopLL)
-		if projected < 0 {
-			projected = 0
-		} else if projected > d {
-			projected = d
-		}
-		distAlong := cumulative + projected
-		perpDist := pointSegmentDistance(polyline[i-1], polyline[i], stopLL)
-		if perpDist < minDist {
-			minDist = perpDist
-			bestDistAlong = distAlong
-		}
-		cumulative += d
-	}
-
-	return bestDistAlong
+	distanceM, _ := MatchPoint(polyline, LatLng{s.Lat, s.Lng})
+	return distanceM
 }
 
-func projectPointOntoSegment(a, b, p LatLng) float64 {
+func ProjectPointOntoSegment(a, b, p LatLng) float64 {
 	ab := LatLng{b.Lat - a.Lat, b.Lng - a.Lng}
 	ap := LatLng{p.Lat - a.Lat, p.Lng - a.Lng}
 	abSq := ab.Lat*ab.Lat + ab.Lng*ab.Lng
@@ -162,25 +141,77 @@ func projectPointOntoSegment(a, b, p LatLng) float64 {
 	return t * segLen
 }
 
-func pointSegmentDistance(a, b, p LatLng) float64 {
+func PointSegmentDistance(a, b, p LatLng) float64 {
 	ab := LatLng{b.Lat - a.Lat, b.Lng - a.Lng}
 	ap := LatLng{p.Lat - a.Lat, p.Lng - a.Lng}
 	abSq := ab.Lat*ab.Lat + ab.Lng*ab.Lng
 
 	if abSq == 0 {
-		return haversine(a, p)
+		return Haversine(a, p)
 	}
 
 	t := (ap.Lat*ab.Lat + ap.Lng*ab.Lng) / abSq
 	if t < 0 {
-		return haversine(a, p)
+		return Haversine(a, p)
 	}
 	if t > 1 {
-		return haversine(b, p)
+		return Haversine(b, p)
 	}
 
 	proj := LatLng{a.Lat + t*ab.Lat, a.Lng + t*ab.Lng}
-	return haversine(proj, p)
+	return Haversine(proj, p)
+}
+
+func MatchPoint(polyline []LatLng, point LatLng) (distanceM float64, confidence float64) {
+	if len(polyline) < 2 {
+		return 0, 0
+	}
+	minDist := math.MaxFloat64
+	bestDistAlong := 0.0
+	cumulative := 0.0
+
+	for i := 1; i < len(polyline); i++ {
+		d := Haversine(polyline[i-1], polyline[i])
+		projected := ProjectPointOntoSegment(polyline[i-1], polyline[i], point)
+		if projected < 0 {
+			projected = 0
+		} else if projected > d {
+			projected = d
+		}
+		distAlong := cumulative + projected
+		perpDist := PointSegmentDistance(polyline[i-1], polyline[i], point)
+		if perpDist < minDist {
+			minDist = perpDist
+			bestDistAlong = distAlong
+		}
+		cumulative += d
+	}
+
+	confidence = 1.0 - math.Min(minDist/100.0, 1.0)
+	return bestDistAlong, confidence
+}
+
+func InterpolatePosition(polyline []LatLng, distanceM float64) LatLng {
+	if len(polyline) == 0 {
+		return LatLng{}
+	}
+	if distanceM <= 0 {
+		return polyline[0]
+	}
+
+	cumulative := 0.0
+	for i := 1; i < len(polyline); i++ {
+		segLen := Haversine(polyline[i-1], polyline[i])
+		if cumulative+segLen >= distanceM {
+			frac := (distanceM - cumulative) / segLen
+			return LatLng{
+				Lat: polyline[i-1].Lat + frac*(polyline[i].Lat-polyline[i-1].Lat),
+				Lng: polyline[i-1].Lng + frac*(polyline[i].Lng-polyline[i-1].Lng),
+			}
+		}
+		cumulative += segLen
+	}
+	return polyline[len(polyline)-1]
 }
 
 func (r *Route) ETAForStop(stopIndex int, distanceAlongM float64, speedMPS float64) float64 {
