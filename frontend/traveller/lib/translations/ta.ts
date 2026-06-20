@@ -2,10 +2,10 @@ import type { Translations } from "./types"
 
 export const ta: Translations = {
   app: {
-    title: "பயணி - போக்குவரத்து திட்டமிடுனர்",
-    description: "AI-இயங்கும் போக்குவரத்து திட்டமிடுனர்",
-    header: "போக்குவரத்து உதவியாளர்",
-    welcome: "வணக்கம். நான் உங்கள் போக்குவரத்து உதவியாளர்.",
+    title: "டிராவெல்லங்கா - AI பயண திட்டமிடுனர்",
+    description: "AI-இயங்கும் இலங்கை பயண திட்டமிடுனர்",
+    header: "டிராவெல்லங்கா",
+    welcome: "வணக்கம். நான் டிராவெல்லங்கா, உங்கள் இலங்கை பயண உதவியாளர்.",
     inputPlaceholder: "செய்தியை தட்டச்சு செய்க...",
     copy: "நகலெடு",
     copied: "நகலெடுக்கப்பட்டது",
@@ -116,8 +116,8 @@ export const ta: Translations = {
     driverEmailPlaceholder: "driver@transit.plus",
   },
   driver: {
-    title: "ஓட்டுநர் இடைவெளி ஆலோசனை",
-    description: "பேருந்து ஓட்டுநர்களுக்கான நிகழ்நேர இடைவெளி ஆலோசனை டாஷ்போர்டு",
+    title: "டிரைவ்லங்கா - ஓட்டுநர் டாஷ்போர்டு",
+    description: "இலங்கைக்கான நிகழ்நேர பேருந்து கண்காணிப்பு மற்றும் இடைவெளி ஆலோசனை",
     route: "வழி",
     routeProgress: "வழி முன்னேற்றம்",
     quickStats: "விரைவு புள்ளிவிவரங்கள்",

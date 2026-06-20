@@ -8,8 +8,8 @@ import { I18nProvider } from "@/lib/i18n";
 const googleSans = Google_Sans({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
-  title: "Driver Headway Advisory",
-  description: "Real-time headway advisory dashboard for bus drivers",
+  title: "DriveLanka - Driver Dashboard",
+  description: "Real-time bus tracking & headway advisory for Sri Lanka",
 };
 
 export default function RootLayout({

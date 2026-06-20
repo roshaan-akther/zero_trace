@@ -2,10 +2,10 @@ import type { Translations } from "./types"
 
 export const si: Translations = {
   app: {
-    title: "සංචාරක - ප්‍රවාහන සැලසුම්කරු",
-    description: "AI බලයෙන් ක්‍රියාත්මක ප්‍රවාහන සැලසුම්කරු",
-    header: "ප්‍රවාහන සහායක",
-    welcome: "ආයුබෝවන්. මම ඔබේ ප්‍රවාහන සහායකයි.",
+    title: "ට්‍රැවල්ලංකා - AI ගමන් සැලසුම්කරු",
+    description: "AI බලයෙන් ක්‍රියාත්මක ශ්‍රී ලංකා ගමන් සැලසුම්කරු",
+    header: "ට්‍රැවල්ලංකා",
+    welcome: "ආයුබෝවන්. මම ට්‍රැවල්ලංකා, ඔබේ ශ්‍රී ලංකා ගමන් සහායකයි.",
     inputPlaceholder: "පණිවිඩයක් ටයිප් කරන්න...",
     copy: "පිටපත් කරන්න",
     copied: "පිටපත් කළා",
@@ -116,8 +116,8 @@ export const si: Translations = {
     driverEmailPlaceholder: "driver@transit.plus",
   },
   driver: {
-    title: "රියදුරු හිස් ගැප් උපදේශනය",
-    description: "බස් රියදුරන් සඳහා සජීවී හිස් ගැප් උපදේශන පුවරුව",
+    title: "ඩ්‍රයිව්ලංකා - රියදුරු පුවරුව",
+    description: "ශ්‍රී ලංකාව සඳහා සජීවී බස් ලුහුබැඳීම සහ හිස් ගැප් උපදේශනය",
     route: "මාර්ගය",
     routeProgress: "මාර්ග ප්‍රගතිය",
     quickStats: "ඉක්මන් සංඛ්‍යා",

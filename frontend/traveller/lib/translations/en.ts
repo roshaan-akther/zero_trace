@@ -1,9 +1,9 @@
 export const en = {
   app: {
-    title: "Traveller - Transit Planner",
-    description: "AI-powered transit travel planner",
-    header: "Transit Travel Assistant",
-    welcome: "Hey there. I'm your Transit Assistant.",
+    title: "TravelLanka - AI Travel Planner",
+    description: "AI-powered travel planner for Sri Lanka",
+    header: "TravelLanka",
+    welcome: "Hey there. I'm TravelLanka, your Sri Lanka travel assistant.",
     inputPlaceholder: "Type a message...",
     copy: "Copy",
     copied: "Copied",
@@ -114,8 +114,8 @@ export const en = {
     driverEmailPlaceholder: "driver@transit.plus",
   },
   driver: {
-    title: "Driver Headway Advisory",
-    description: "Real-time headway advisory dashboard for bus drivers",
+    title: "DriveLanka - Driver Dashboard",
+    description: "Real-time bus tracking & headway advisory for Sri Lanka",
     route: "Route",
     routeProgress: "Route Progress",
     quickStats: "Quick Stats",

@@ -1,7 +1,7 @@
 export const en = {
   app: {
-    title: "Driver Headway Advisory",
-    description: "Real-time headway advisory dashboard for bus drivers",
+    title: "DriveLanka - Driver Dashboard",
+    description: "Real-time bus tracking & headway advisory for Sri Lanka",
     signOut: "Sign out",
   },
   driver: {

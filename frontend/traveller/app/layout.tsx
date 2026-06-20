@@ -29,8 +29,8 @@ const montserrat = Montserrat({
 })
 
 export const metadata: Metadata = {
-  title: "Traveller - Transit Planner",
-  description: "AI-powered transit travel planner",
+  title: "TravelLanka - AI Travel Planner",
+  description: "AI-powered travel planner for Sri Lanka",
 }
 
 export default function RootLayout({
