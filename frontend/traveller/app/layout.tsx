@@ -1,11 +1,15 @@
 import type { Metadata } from "next"
-import { Geist, Geist_Mono, Nunito_Sans, Instrument_Sans, Montserrat } from "next/font/google"
+import { Google_Sans, Nunito_Sans, Instrument_Sans, Montserrat } from "next/font/google"
 import "./globals.css"
 import { cn } from "@/lib/utils"
 import { ThemeProvider } from "@/components/theme-provider"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { I18nProvider } from "@/lib/i18n"
 
-const geistHeading = Geist({ subsets: ["latin"], variable: "--font-heading" })
+const googleSansHeading = Google_Sans({
+  subsets: ["latin"],
+  variable: "--font-heading",
+})
 
 const nunitoSans = Nunito_Sans({ subsets: ["latin"], variable: "--font-sans" })
 
@@ -14,13 +18,8 @@ const instrumentSans = Instrument_Sans({
   variable: "--font-instrument-sans",
 })
 
-const geistSans = Geist({
+const googleSans = Google_Sans({
   variable: "--font-geist-sans",
-  subsets: ["latin"],
-})
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
   subsets: ["latin"],
 })
 
@@ -43,7 +42,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={cn("h-full", "antialiased", geistSans.variable, geistMono.variable, "font-sans", nunitoSans.variable, geistHeading.variable, instrumentSans.variable, montserrat.variable)}
+      className={cn("h-full", "antialiased", googleSans.variable, googleSans.variable, "font-sans", nunitoSans.variable, googleSansHeading.variable, instrumentSans.variable, montserrat.variable)}
     >
       <head>
         <style
@@ -75,7 +74,9 @@ export default function RootLayout({
           disableTransitionOnChange
           storageKey="traveller-theme"
         >
-          <TooltipProvider>{children}</TooltipProvider>
+          <TooltipProvider>
+            <I18nProvider>{children}</I18nProvider>
+          </TooltipProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -187,6 +187,20 @@ export function getRouteStops(routeID: string) {
   return request<{ route_id: string; stops: any[] }>(`/api/v1/routes/${routeID}/stops`)
 }
 
+export interface ETAVehicle {
+  vehicle_id: string
+  distance_m: number
+  speed_mps: number
+  eta_s: number
+  confidence: number
+}
+
+export function getRouteETA(routeID: string, stopID: string) {
+  return request<{ route_id: string; stop_id: string; vehicles: ETAVehicle[] }>(
+    `/api/v1/eta?route_id=${encodeURIComponent(routeID)}&stop_id=${encodeURIComponent(stopID)}`
+  )
+}
+
 export interface NearbyVehicle {
   vehicle?: {
     id: string

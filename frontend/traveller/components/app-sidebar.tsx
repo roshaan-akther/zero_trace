@@ -15,10 +15,12 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { PencilLineIcon } from "lucide-react"
+import { useI18n } from "@/lib/i18n"
 
 const SIDEBAR_STATE_KEY = "traveller-sidebar-state"
 
 function Navigation() {
+  const { t } = useI18n()
   const { state, isMobile } = useSidebar()
   const isCollapsed = state === "collapsed" && !isMobile
 
@@ -32,11 +34,11 @@ function Navigation() {
         <SidebarMenu className="animate-in fade-in duration-300">
           <SidebarMenuItem>
             <SidebarMenuButton
-              tooltip="New Chat"
+              tooltip={t.app.newChat}
               onClick={handleNewChat}
             >
               <PencilLineIcon />
-              {!isCollapsed && <span>New Chat</span>}
+              {!isCollapsed && <span>{t.app.newChat}</span>}
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

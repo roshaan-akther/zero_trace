@@ -39,7 +39,9 @@ import {
   ArrowDown,
   Circle,
 } from "lucide-react"
-import { getToken, getUser, clearToken, getRoutes, getRouteDetail, getHeadway, getAdvisories, markAdvisoryRead, sendGPS, getGPSHistory, getStatus } from "@/lib/api"
+import { getToken, getUser, clearToken, getRoutes, getRouteDetail, getHeadway, getAdvisories, markAdvisoryRead, sendGPS, getMyVehicle, getStatus } from "@/lib/api"
+import { useI18n } from "@/lib/i18n"
+import { LanguageSwitcher } from "@/components/language-switcher"
 
 const POLL_INTERVAL = 5000
 
@@ -49,14 +51,14 @@ const headwayColors = {
 
 export default function DriverDashboard() {
   const router = useRouter()
+  const { t } = useI18n()
   const [ready, setReady] = useState(false)
   const [user, setUserState] = useState<{ id: string; email: string; name: string; type: string } | null>(null)
-  const [selectedRoute, setSelectedRoute] = useState("138")
+  const [selectedRoute, setSelectedRoute] = useState("")
   const [routeInfo, setRouteInfo] = useState<any>(null)
   const [stops, setStops] = useState<any[]>([])
   const [headwayVehicles, setHeadwayVehicles] = useState<any[]>([])
   const [advisories, setAdvisories] = useState<any[]>([])
-  const [gpsPoints, setGpsPoints] = useState<any[]>([])
   const [status, setStatus] = useState<any>(null)
   const [headwayHistory, setHeadwayHistory] = useState<any[]>([])
   const [speed, setSpeed] = useState(0)
@@ -65,6 +67,8 @@ export default function DriverDashboard() {
   const [nextStopName, setNextStopName] = useState("")
   const [nextStopETA, setNextStopETA] = useState(0)
   const [routes, setRoutes] = useState<any[]>([])
+  const [error, setError] = useState("")
+  const [gpsLocation, setGpsLocation] = useState<{ lat: number; lng: number } | null>(null)
 
   useEffect(() => {
     const token = getToken()
@@ -75,13 +79,29 @@ export default function DriverDashboard() {
     }
     setUserState(u)
     setReady(true)
+
+    getMyVehicle().then(veh => {
+      if (veh?.vehicle?.route_id) {
+        setSelectedRoute(veh.vehicle.route_id)
+      }
+    }).catch(() => {
+      setSelectedRoute("138")
+    })
+
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => setGpsLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => {}
+      )
+    }
   }, [router])
 
   const fetchData = useCallback(async () => {
+    if (!selectedRoute) return
     try {
       const [r, rd, h, a, s] = await Promise.all([
         getRoutes(),
-        getRouteDetail(selectedRoute),
+        getRouteDetail(selectedRoute).catch(() => null),
         getHeadway(selectedRoute).catch(() => null),
         getAdvisories(),
         getStatus(),
@@ -91,6 +111,10 @@ export default function DriverDashboard() {
       setStops(rd?.stops || [])
       setAdvisories(a.advisories)
       setStatus(s)
+
+      if (gpsLocation) {
+        sendGPS(gpsLocation.lat, gpsLocation.lng, (h?.vehicles?.[0]?.forward_speed_mps) || 0).catch(() => {})
+      }
 
       if (h?.vehicles && h.vehicles.length > 0) {
         setHeadwayVehicles(h.vehicles)
@@ -114,10 +138,11 @@ export default function DriverDashboard() {
           }
         }
       }
+      setError("")
     } catch (e) {
-      // silently handle poll errors
+      setError(e instanceof Error ? e.message : "Failed to fetch data")
     }
-  }, [selectedRoute])
+  }, [selectedRoute, gpsLocation])
 
   useEffect(() => {
     if (!ready) return
@@ -140,7 +165,7 @@ export default function DriverDashboard() {
     }
     setNextStopName("Terminal")
     setNextStopETA(0)
-  }, [stops, currentDistance, speed])
+  }, [stops, currentDistance, speed, t])
 
   useEffect(() => {
     findNextStop()
@@ -161,7 +186,7 @@ export default function DriverDashboard() {
     .map((s, i) => {
       const remainingKM = (s.distance_m - (currentDistance || 0)) / 1000
       const etaMin = Math.round((remainingKM / Math.max(speed, 20)) * 60)
-      return { name: s.name, eta: `${etaMin} min`, status: i === 0 ? ("next" as const) : ("upcoming" as const) }
+      return { name: s.name, eta: `${etaMin} ${t.driver.min}`, status: i === 0 ? ("next" as const) : ("upcoming" as const) }
     })
 
   return (
@@ -175,7 +200,7 @@ export default function DriverDashboard() {
                   <AvatarFallback>{initials}</AvatarFallback>
                 </Avatar>
                 <div className="grid flex-1 text-left text-sm leading-tight group-data-[collapsible=icon]:hidden">
-                  <span className="truncate font-semibold">{user?.name || "Driver"}</span>
+                  <span className="truncate font-semibold">{user?.name || t.driver.driver}</span>
                   <span className="truncate text-xs text-muted-foreground">{user?.email || ""}</span>
                 </div>
               </SidebarMenuButton>
@@ -185,7 +210,7 @@ export default function DriverDashboard() {
 
         <SidebarContent>
           <SidebarGroup>
-            <SidebarGroupLabel>Route</SidebarGroupLabel>
+            <SidebarGroupLabel>{t.driver.route}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 {routes.slice(0, 5).map(r => (
@@ -207,7 +232,7 @@ export default function DriverDashboard() {
           <SidebarSeparator />
 
           <SidebarGroup>
-            <SidebarGroupLabel>Route Progress</SidebarGroupLabel>
+            <SidebarGroupLabel>{t.driver.routeProgress}</SidebarGroupLabel>
             <SidebarGroupContent>
               <div className="px-3 group-data-[collapsible=icon]:hidden">
                 <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
@@ -217,7 +242,7 @@ export default function DriverDashboard() {
                 <Progress value={progress} />
                 <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
                   <MapPin className="size-3" />
-                  <span>{nextStopName || "Unknown"} · {nextStopETA} min away</span>
+                  <span>{nextStopName || t.driver.unknown} · {nextStopETA} {t.driver.min} away</span>
                 </div>
               </div>
             </SidebarGroupContent>
@@ -226,15 +251,15 @@ export default function DriverDashboard() {
           <SidebarSeparator />
 
           <SidebarGroup>
-            <SidebarGroupLabel>Quick Stats</SidebarGroupLabel>
+            <SidebarGroupLabel>{t.driver.quickStats}</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem>
                   <SidebarMenuButton>
                     <Gauge />
                     <div className="flex w-full items-center justify-between">
-                      <span>Speed</span>
-                      <span className="text-xs text-muted-foreground">{speed} km/h</span>
+                      <span>{t.driver.speed}</span>
+                      <span className="text-xs text-muted-foreground">{speed} {t.driver.kmh}</span>
                     </div>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -242,9 +267,9 @@ export default function DriverDashboard() {
                   <SidebarMenuButton>
                     <Navigation />
                     <div className="flex w-full items-center justify-between">
-                      <span>Headway</span>
+                      <span>{t.driver.headway}</span>
                       <span className="text-xs text-muted-foreground">
-                        {headwayVehicles[0] ? `${(headwayVehicles[0].gap_m / 1000).toFixed(1)} km` : "N/A"}
+                        {headwayVehicles[0] ? `${(headwayVehicles[0].gap_m / 1000).toFixed(1)} ${t.driver.km}` : t.driver.na}
                       </span>
                     </div>
                   </SidebarMenuButton>
@@ -253,8 +278,8 @@ export default function DriverDashboard() {
                   <SidebarMenuButton>
                     <Users />
                     <div className="flex w-full items-center justify-between">
-                      <span>Stops</span>
-                      <span className="text-xs text-muted-foreground">{stops.length} total</span>
+                      <span>{t.driver.stops}</span>
+                      <span className="text-xs text-muted-foreground">{stops.length} {t.driver.total}</span>
                     </div>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -262,8 +287,8 @@ export default function DriverDashboard() {
                   <SidebarMenuButton>
                     <Bus />
                     <div className="flex w-full items-center justify-between">
-                      <span>Vehicles</span>
-                      <span className="text-xs text-muted-foreground">{status?.vehicles_tracked || 0} tracked</span>
+                      <span>{t.driver.vehicles}</span>
+                      <span className="text-xs text-muted-foreground">{status?.vehicles_tracked || 0} {t.driver.tracked}</span>
                     </div>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -277,7 +302,7 @@ export default function DriverDashboard() {
             <SidebarMenuItem>
               <SidebarMenuButton onClick={handleSignOut} className="text-destructive">
                 <Bell />
-                <span>Sign out</span>
+                <span>{t.app.signOut}</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
           </SidebarMenu>
@@ -289,6 +314,7 @@ export default function DriverDashboard() {
       <SidebarInset>
         <header className="flex items-center gap-3 border-b border-border px-6 py-3">
           <SidebarTrigger />
+          <LanguageSwitcher />
           <div className="flex flex-1 items-center gap-4">
             <div className="flex items-center gap-2">
               <Bus className="size-5 text-primary" />
@@ -297,62 +323,67 @@ export default function DriverDashboard() {
             <div className="ml-auto flex items-center gap-2">
               <Badge variant="default" className="gap-1">
                 <Circle className="size-2 fill-green-500 text-green-500" />
-                Live
+                {t.driver.live}
               </Badge>
               {headwayVehicles.length > 0 && (
                 <Badge variant="secondary" className="gap-1">
                   <Circle className="size-2 fill-yellow-500 text-yellow-500" />
-                  {headwayVehicles.length} ahead
+                  {headwayVehicles.length} {t.driver.ahead}
                 </Badge>
               )}
             </div>
           </div>
         </header>
 
+        {error && (
+          <div className="px-6 pt-4">
+            <div className="px-3 py-2 text-xs text-destructive bg-destructive/10 rounded-lg">{error}</div>
+          </div>
+        )}
         <div className="flex-1 space-y-6 p-6">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Speed</CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">{t.driver.speed}</CardTitle>
                 <Gauge className="size-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{speed} <span className="text-sm font-normal text-muted-foreground">km/h</span></div>
+                <div className="text-2xl font-bold">{speed} <span className="text-sm font-normal text-muted-foreground">{t.driver.kmh}</span></div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Headway (Ahead)</CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">{t.driver.headwayAhead}</CardTitle>
                 <Navigation className="size-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  {headwayVehicles[0] ? `${(headwayVehicles[0].gap_m / 1000).toFixed(1)}` : "N/A"}
-                  <span className="text-sm font-normal text-muted-foreground"> km</span>
+                  {headwayVehicles[0] ? `${(headwayVehicles[0].gap_m / 1000).toFixed(1)}` : t.driver.na}
+                  <span className="text-sm font-normal text-muted-foreground"> {t.driver.km}</span>
                 </div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Vehicles Tracked</CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">{t.driver.vehiclesTracked}</CardTitle>
                 <Navigation className="size-4 rotate-180 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{status?.vehicles_tracked || 0} <span className="text-sm font-normal text-muted-foreground">buses</span></div>
+                <div className="text-2xl font-bold">{status?.vehicles_tracked || 0} <span className="text-sm font-normal text-muted-foreground">{t.driver.buses}</span></div>
               </CardContent>
             </Card>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">Next Stop ETA</CardTitle>
+                <CardTitle className="text-sm font-medium text-muted-foreground">{t.driver.nextStopETA}</CardTitle>
                 <MapPin className="size-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{nextStopETA} <span className="text-sm font-normal text-muted-foreground">min</span></div>
+                <div className="text-2xl font-bold">{nextStopETA} <span className="text-sm font-normal text-muted-foreground">{t.driver.min}</span></div>
                 <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                  <MapPin className="size-3" /> {nextStopName || "Unknown"}
+                  <MapPin className="size-3" /> {nextStopName || t.driver.unknown}
                 </p>
               </CardContent>
             </Card>
@@ -361,8 +392,8 @@ export default function DriverDashboard() {
           <div className="grid gap-4 lg:grid-cols-7">
             <Card className="lg:col-span-4">
               <CardHeader>
-                <CardTitle>Headway Trend</CardTitle>
-                <p className="text-sm text-muted-foreground">Distance to bus ahead (real-time)</p>
+                <CardTitle>{t.driver.headwayTrend}</CardTitle>
+                <p className="text-sm text-muted-foreground">{t.driver.headwayTrendDesc}</p>
               </CardHeader>
               <CardContent>
                 <ChartContainer config={headwayColors} className="aspect-auto h-[250px] w-full">
@@ -375,7 +406,7 @@ export default function DriverDashboard() {
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
                     <XAxis dataKey="time" tickLine={false} axisLine={false} tickMargin={8} />
-                    <YAxis tickLine={false} axisLine={false} tickMargin={8} unit=" km" />
+                    <YAxis tickLine={false} axisLine={false} tickMargin={8} unit={` ${t.driver.km}`} />
                     <ChartTooltip content={<ChartTooltipContent />} />
                     <Area
                       type="monotone"
@@ -391,26 +422,26 @@ export default function DriverDashboard() {
 
             <Card className="lg:col-span-3">
               <CardHeader>
-                <CardTitle>Route Progress</CardTitle>
+                <CardTitle>{t.driver.routeProgressTitle}</CardTitle>
                 <p className="text-sm text-muted-foreground">{routeInfo?.name || selectedRoute}</p>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
                   <div className="mb-1 flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Progress</span>
+                    <span className="text-muted-foreground">{t.driver.progress}</span>
                     <span className="font-medium">{progress}%</span>
                   </div>
                   <Progress value={progress} />
                   <div className="mt-1 flex items-center justify-between text-xs text-muted-foreground">
-                    <span>{(currentDistance / 1000).toFixed(1)} km done</span>
-                    <span>{routeInfo ? (((routeInfo.total_length_m - currentDistance) / 1000)).toFixed(1) : "?"} km left</span>
+                    <span>{(currentDistance / 1000).toFixed(1)} {t.driver.km} {t.driver.done}</span>
+                    <span>{routeInfo ? (((routeInfo.total_length_m - currentDistance) / 1000)).toFixed(1) : "?"} {t.driver.km} {t.driver.left}</span>
                   </div>
                 </div>
 
                 <Separator />
 
                 <div className="space-y-3">
-                  <h4 className="text-sm font-medium">Upcoming Stops</h4>
+                  <h4 className="text-sm font-medium">{t.driver.upcomingStops}</h4>
                   <div className="space-y-2">
                     {upcomingStops.length > 0 ? upcomingStops.map((stop) => (
                       <div
@@ -430,7 +461,7 @@ export default function DriverDashboard() {
                         </div>
                       </div>
                     )) : (
-                      <p className="text-sm text-muted-foreground">No upcoming stops</p>
+                      <p className="text-sm text-muted-foreground">{t.driver.noUpcomingStops}</p>
                     )}
                   </div>
                 </div>
@@ -441,12 +472,12 @@ export default function DriverDashboard() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
-                <CardTitle>Advisories</CardTitle>
-                <p className="text-sm text-muted-foreground">Real-time advisories</p>
+                <CardTitle>{t.driver.advisories}</CardTitle>
+                <p className="text-sm text-muted-foreground">{t.driver.advisoriesDesc}</p>
               </div>
               <Badge variant="outline" className="gap-1">
                 <Bell className="size-3" />
-                {advisories.filter(a => !a.read).length} New
+                {advisories.filter(a => !a.read).length} {t.driver.new}
               </Badge>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -477,13 +508,13 @@ export default function DriverDashboard() {
                         {new Date(advisory.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                       </span>
                       {!advisory.read && (
-                        <span className="text-[10px] text-primary font-medium">NEW</span>
+                        <span className="text-[10px] text-primary font-medium">{t.driver.new}</span>
                       )}
                     </div>
                   </div>
                 )
               }) : (
-                <p className="text-sm text-muted-foreground text-center py-4">No advisories</p>
+                <p className="text-sm text-muted-foreground text-center py-4">{t.driver.noAdvisories}</p>
               )}
             </CardContent>
           </Card>

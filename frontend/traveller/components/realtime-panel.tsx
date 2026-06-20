@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { Clock, Bus, Navigation, MapPin, RefreshCw, LocateFixed } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { getNearbyVehicles, NearbyVehicle } from "@/lib/api"
+import { useI18n } from "@/lib/i18n"
 
 const COLOMBO_CENTER = { lat: 6.9271, lng: 79.8612 }
 
@@ -13,11 +14,13 @@ interface Props {
 }
 
 export function RealtimePanel({ isOpen, onToggle }: Props) {
+  const { t } = useI18n()
   const [vehicles, setVehicles] = useState<NearbyVehicle[]>([])
   const [loading, setLoading] = useState(false)
   const [location, setLocation] = useState(COLOMBO_CENTER)
   const [error, setError] = useState("")
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const locationRef = useRef(COLOMBO_CENTER)
 
   const fetchVehicles = async (lat: number, lng: number) => {
     setLoading(true)
@@ -26,7 +29,7 @@ export function RealtimePanel({ isOpen, onToggle }: Props) {
       const res = await getNearbyVehicles(lat, lng, 100)
       setVehicles(res.vehicles.filter(v => v.confidence >= 0.2))
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to fetch")
+      setError(e instanceof Error ? e.message : t.realtime.failed)
     } finally {
       setLoading(false)
     }
@@ -37,6 +40,7 @@ export function RealtimePanel({ isOpen, onToggle }: Props) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+          locationRef.current = loc
           setLocation(loc)
           fetchVehicles(loc.lat, loc.lng)
         },
@@ -53,7 +57,8 @@ export function RealtimePanel({ isOpen, onToggle }: Props) {
     if (isOpen) {
       requestLocation()
       intervalRef.current = setInterval(() => {
-        fetchVehicles(location.lat, location.lng)
+        const loc = locationRef.current
+        fetchVehicles(loc.lat, loc.lng)
       }, 10000)
     } else {
       if (intervalRef.current) {
@@ -70,7 +75,7 @@ export function RealtimePanel({ isOpen, onToggle }: Props) {
     <>
       <Button variant="ghost" size="sm" onClick={onToggle} className="gap-1.5">
         <Clock className="h-4 w-4" />
-        <span className="hidden sm:inline">Live</span>
+        <span className="hidden sm:inline">{t.realtime.live}</span>
       </Button>
 
       {isOpen && (
@@ -78,13 +83,13 @@ export function RealtimePanel({ isOpen, onToggle }: Props) {
           <div className="flex items-center justify-between px-4 py-3 border-b shrink-0">
             <div className="flex items-center gap-2">
               <Bus className="w-4 h-4 text-primary" />
-              <span className="text-sm font-medium">Nearby Vehicles</span>
+              <span className="text-sm font-medium">{t.realtime.nearbyVehicles}</span>
             </div>
             <div className="flex items-center gap-1">
-              <Button variant="ghost" size="icon" className="size-7" onClick={requestLocation} title="Use my location">
+              <Button variant="ghost" size="icon" className="size-7" onClick={requestLocation} title={t.realtime.useLocation}>
                 <LocateFixed className="w-3.5 h-3.5" />
               </Button>
-              <Button variant="ghost" size="icon" className="size-7" onClick={() => fetchVehicles(location.lat, location.lng)} title="Refresh">
+              <Button variant="ghost" size="icon" className="size-7" onClick={() => fetchVehicles(location.lat, location.lng)} title={t.realtime.refresh}>
                 <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
               </Button>
             </div>
@@ -98,7 +103,7 @@ export function RealtimePanel({ isOpen, onToggle }: Props) {
             {!loading && vehicles.length === 0 && !error && (
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <Bus className="w-8 h-8 text-muted-foreground/30 mb-2" />
-                <p className="text-xs text-muted-foreground/60">No vehicles nearby</p>
+                <p className="text-xs text-muted-foreground/60">{t.realtime.noVehicles}</p>
               </div>
             )}
 
@@ -120,10 +125,10 @@ export function RealtimePanel({ isOpen, onToggle }: Props) {
                         {v.next_stop_name && (
                           <p className="text-xs text-muted-foreground/70 mt-1 flex items-center gap-1">
                             <MapPin className="w-3 h-3 shrink-0" />
-                            Next: {v.next_stop_name}
+                            {t.realtime.next}: {v.next_stop_name}
                             {v.eta_s !== undefined && v.eta_s > 0 && v.eta_s < 1e9 && (
                               <span className="font-medium text-foreground/80">
-                                · {Math.round(v.eta_s / 60)} min
+                                · {Math.round(v.eta_s / 60)} {t.realtime.min}
                               </span>
                             )}
                           </p>
@@ -148,13 +153,13 @@ export function RealtimePanel({ isOpen, onToggle }: Props) {
 
             {loading && vehicles.length > 0 && (
               <div className="px-4 py-2 text-xs text-muted-foreground/50 text-center border-t">
-                Refreshing...
+                {t.realtime.refreshing}
               </div>
             )}
           </div>
 
           <div className="px-4 py-2 border-t text-[10px] text-muted-foreground/40 text-center shrink-0">
-            100km radius · Updates every 10s
+            {t.realtime.footer}
           </div>
         </div>
       )}

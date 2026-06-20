@@ -2,6 +2,7 @@ package simulator
 
 import (
 	"math/rand"
+	"strings"
 	"time"
 
 	"github.com/agentrix/backend/internal/engine"
@@ -39,48 +40,74 @@ type Simulator struct {
 }
 
 func New(eng *engine.Engine, g *graph.RouteGraph) *Simulator {
-	return &Simulator{
+	s := &Simulator{
 		engine:     eng,
 		graph:      g,
 		rng:        rand.New(rand.NewSource(time.Now().UnixNano())),
 		spawnTimer: make(map[string]time.Duration),
-		cfg:        defaultConfigs(),
 	}
+	s.cfg = generateConfigs(g, s.rng)
+	return s
 }
 
-func defaultConfigs() map[string]*RouteConfig {
-	return map[string]*RouteConfig{
-		"138": {
-			HeadwayMin: 8 * time.Minute, HeadwayMax: 12 * time.Minute,
-			DwellMin: 15 * time.Second, DwellMax: 30 * time.Second,
-			InitCount: 3,
-		},
-		"100": {
-			HeadwayMin: 12 * time.Minute, HeadwayMax: 18 * time.Minute,
-			DwellMin: 10 * time.Second, DwellMax: 25 * time.Second,
-			InitCount: 3,
-		},
-		"177": {
-			HeadwayMin: 10 * time.Minute, HeadwayMax: 15 * time.Minute,
-			DwellMin: 12 * time.Second, DwellMax: 28 * time.Second,
-			InitCount: 3,
-		},
-		"coast-line": {
-			HeadwayMin: 20 * time.Minute, HeadwayMax: 40 * time.Minute,
-			DwellMin: 30 * time.Second, DwellMax: 60 * time.Second,
-			InitCount: 2,
-		},
-		"tw-pettah-fort": {
-			HeadwayMin: 2 * time.Minute, HeadwayMax: 4 * time.Minute,
-			DwellMin: 0, DwellMax: 0,
-			InitCount: 0,
-		},
-		"tw-wellawatta-dehiwala": {
-			HeadwayMin: 3 * time.Minute, HeadwayMax: 5 * time.Minute,
-			DwellMin: 0, DwellMax: 0,
-			InitCount: 0,
-		},
+func generateConfigs(g *graph.RouteGraph, rng *rand.Rand) map[string]*RouteConfig {
+	cfg := make(map[string]*RouteConfig)
+	for id, route := range g.Routes {
+		isMajor := false
+		for _, major := range []string{"138", "100", "101", "177", "120", "154"} {
+			if id == major || strings.HasPrefix(id, major+"-") {
+				isMajor = true
+				break
+			}
+		}
+		isReverse := strings.HasSuffix(id, "-rev")
+
+		switch route.VehicleType {
+		case graph.VehicleBus:
+			headwayMin := 10 * time.Minute
+			headwayMax := 20 * time.Minute
+			initCount := 2
+			if isMajor {
+				headwayMin = 5 * time.Minute
+				headwayMax = 12 * time.Minute
+				initCount = 3
+			}
+			if isReverse {
+				initCount = 1
+			}
+			if route.TotalLengthM > 30000 {
+				initCount++
+			}
+			cfg[id] = &RouteConfig{
+				HeadwayMin: headwayMin,
+				HeadwayMax: headwayMax,
+				DwellMin:   15 * time.Second,
+				DwellMax:   30 * time.Second,
+				InitCount:  initCount,
+			}
+		case graph.VehicleTrain:
+			cfg[id] = &RouteConfig{
+				HeadwayMin: 20 * time.Minute,
+				HeadwayMax: 40 * time.Minute,
+				DwellMin:   30 * time.Second,
+				DwellMax:   60 * time.Second,
+				InitCount:  1,
+			}
+		case graph.VehicleThreeWheeler:
+			initCount := 3
+			if isReverse {
+				initCount = 2
+			}
+			cfg[id] = &RouteConfig{
+				HeadwayMin: 1 * time.Minute,
+				HeadwayMax: 3 * time.Minute,
+				DwellMin:   0,
+				DwellMax:   0,
+				InitCount:  initCount,
+			}
+		}
 	}
+	return cfg
 }
 
 func (s *Simulator) SetConfig(routeID string, cfg *RouteConfig) {

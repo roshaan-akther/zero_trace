@@ -5,6 +5,10 @@ import { AppSidebar } from "@/components/app-sidebar"
 import { AppHeader } from "@/components/app-header"
 import { ChatUI, Message } from "@/components/chat-ui"
 import { PlanPanel } from "@/components/plan-panel"
+import { RoutesPanel } from "@/components/routes-panel"
+import { DynamicTimetablePanel } from "@/components/dynamic-timetable-panel"
+import { getToken } from "@/lib/api"
+import { useI18n } from "@/lib/i18n"
 import {
   SidebarInset,
   SidebarProvider,
@@ -13,6 +17,10 @@ import {
 interface PanelContextType {
   isPlanPanelOpen: boolean
   setPlanPanelOpen: (open: boolean) => void
+  isRoutesPanelOpen: boolean
+  setRoutesPanelOpen: (open: boolean) => void
+  isTimetablePanelOpen: boolean
+  setTimetablePanelOpen: (open: boolean) => void
 }
 
 export const PanelContext = createContext<PanelContextType | undefined>(undefined)
@@ -26,10 +34,13 @@ export function usePanel() {
 }
 
 export default function HomeShell() {
+  const { lang } = useI18n()
   const [messages, setMessages] = useState<Message[]>([])
   const [isGenerating, setIsGenerating] = useState(false)
   const [planResult, setPlanResult] = useState<string | null>(null)
   const [isPlanPanelOpen, setIsPlanPanelOpen] = useState(false)
+  const [isRoutesPanelOpen, setIsRoutesPanelOpen] = useState(false)
+  const [isTimetablePanelOpen, setIsTimetablePanelOpen] = useState(false)
   const abortControllerRef = useRef<AbortController | null>(null)
   const pendingToolNamesRef = useRef<Record<string, string>>({})
 
@@ -56,11 +67,47 @@ export default function HomeShell() {
     abortControllerRef.current = abortController
 
     try {
+      const historyMessages: { role: string; content: string; tool_calls?: any[]; tool_call_id?: string }[] = []
+      for (const m of messages) {
+        if (m.role === "user") {
+          historyMessages.push({ role: "user", content: m.content })
+        } else if (m.role === "assistant") {
+          const completedTools = (m.events || []).filter(
+            (e) => e.type === "tool_call" && e.status === "complete"
+          ) as { id: string; name: string; arguments: Record<string, unknown>; result?: string }[]
+          if (completedTools.length > 0) {
+            historyMessages.push({
+              role: "assistant",
+              content: m.content || null as any,
+              tool_calls: completedTools.map(tc => ({
+                id: tc.id,
+                type: "function",
+                function: { name: tc.name, arguments: JSON.stringify(tc.arguments) },
+              })),
+            })
+            for (const tc of completedTools) {
+              if (tc.result !== undefined) {
+                historyMessages.push({
+                  role: "tool" as const,
+                  tool_call_id: tc.id,
+                  content: tc.result || "",
+                })
+              }
+            }
+          } else {
+            historyMessages.push({ role: "assistant", content: m.content })
+          }
+        }
+      }
+      historyMessages.push({ role: "user", content: message })
+
       const response = await fetch("/api/agent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: messages.map((m) => ({ role: m.role, content: m.content })).concat([{ role: "user", content: message }]),
+          messages: historyMessages,
+          token: getToken(),
+          lang,
         }),
         signal: abortController.signal,
       })
@@ -76,17 +123,22 @@ export default function HomeShell() {
         throw new Error("No response body")
       }
 
+      let sseBuffer = ""
+
       outer: while (true) {
         const { done, value } = await reader.read()
         if (done) break
 
-        const chunk = decoder.decode(value, { stream: true })
-        const lines = chunk.split("\n").filter((line) => line.trim())
+        sseBuffer += decoder.decode(value, { stream: true })
+        const lines = sseBuffer.split("\n")
+        sseBuffer = lines.pop() || ""
 
         for (const line of lines) {
-          if (!line.startsWith("data: ")) continue
+          const trimmed = line.trim()
+          if (!trimmed) continue
+          if (!trimmed.startsWith("data: ")) continue
 
-          const raw = line.slice(6)
+          const raw = trimmed.slice(6)
           if (raw === "[DONE]") break outer
 
           let parsed: {
@@ -98,6 +150,7 @@ export default function HomeShell() {
             result?: string
             isError?: boolean
             status?: string
+            error?: string
           }
 
           try {
@@ -106,7 +159,15 @@ export default function HomeShell() {
             continue
           }
 
-          if (parsed.type === "text" && parsed.content) {
+          if (parsed.type === "error" && parsed.error) {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === aiMessage.id
+                  ? { ...m, content: m.content + `\n\n**Error:** ${parsed.error}` }
+                  : m,
+              ),
+            )
+          } else if (parsed.type === "text" && parsed.content) {
             setMessages((prev) =>
               prev.map((m) =>
                 m.id === aiMessage.id
@@ -233,7 +294,7 @@ export default function HomeShell() {
   }
 
   return (
-    <PanelContext.Provider value={{ isPlanPanelOpen, setPlanPanelOpen: setIsPlanPanelOpen }}>
+    <PanelContext.Provider value={{ isPlanPanelOpen, setPlanPanelOpen: setIsPlanPanelOpen, isRoutesPanelOpen, setRoutesPanelOpen: setIsRoutesPanelOpen, isTimetablePanelOpen, setTimetablePanelOpen: setIsTimetablePanelOpen }}>
       <SidebarProvider className="border-border/25">
         <AppSidebar />
         <div className={`flex-1 flex h-screen transition-all duration-300 ${isPlanPanelOpen ? 'mr-[50vw]' : ''}`}>
@@ -254,6 +315,14 @@ export default function HomeShell() {
           onClose={() => setIsPlanPanelOpen(false)}
         />
       </div>
+      <RoutesPanel
+        isOpen={isRoutesPanelOpen}
+        onClose={() => setIsRoutesPanelOpen(false)}
+      />
+      <DynamicTimetablePanel
+        isOpen={isTimetablePanelOpen}
+        onClose={() => setIsTimetablePanelOpen(false)}
+      />
     </PanelContext.Provider>
   )
 }

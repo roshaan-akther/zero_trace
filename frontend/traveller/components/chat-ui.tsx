@@ -1,10 +1,13 @@
 "use client"
 
 import { useRef, useEffect, useState } from "react"
+import ReactMarkdown from "react-markdown"
+import remarkGfm from "remark-gfm"
 import { MessageBar } from "@/components/message-bar"
 import { Copy, Check } from "lucide-react"
 import { ToolCallBlock } from "@/components/tool-call-block"
 import { ThinkingBlock } from "@/components/thinking-block"
+import { useI18n } from "@/lib/i18n"
 
 export interface ToolCallEvent {
   id: string
@@ -35,6 +38,7 @@ interface ChatUIProps {
 }
 
 export function ChatUI({ messages, onMessage, isGenerating, onStopGeneration }: ChatUIProps) {
+  const { t } = useI18n()
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const chatContainerRef = useRef<HTMLDivElement>(null)
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null)
@@ -95,7 +99,7 @@ export function ChatUI({ messages, onMessage, isGenerating, onStopGeneration }: 
                               return groups.map((group, gIdx) => {
                                 const isActive = group.some(e => (e.type === "thinking" && e.status === "pending") || (e.type === "tool_call" && e.status === "pending"))
                                 const hasThinking = group.some(e => e.type === "thinking")
-                                const label = hasThinking ? (isActive ? "Thinking..." : "Thought") : (isActive ? "Working..." : "Worked")
+                                const label = hasThinking ? (isActive ? t.chat.thinking : t.chat.thought) : (isActive ? t.chat.working : t.chat.worked)
                                 return (
                                   <div key={`round-${gIdx}`} className="mt-0 mb-2 rounded-xl overflow-hidden backdrop-blur-sm">
                                     <button
@@ -143,8 +147,44 @@ export function ChatUI({ messages, onMessage, isGenerating, onStopGeneration }: 
                             })()}
                           </div>
                         )}
-                        <div className="text-sm text-foreground/90 leading-relaxed whitespace-pre-wrap">
-                          {message.content}
+                        <div className="text-sm text-foreground/90 leading-relaxed">
+                          <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
+                            components={{
+                              a: ({ href, children }) => (
+                                <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary underline hover:no-underline">{children}</a>
+                              ),
+                              strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                              code: ({ className, children, ...props }) => {
+                                const isInline = !className
+                                if (isInline) {
+                                  return <code className="px-1.5 py-0.5 rounded-md bg-muted text-sm font-mono">{children}</code>
+                                }
+                                return (
+                                  <pre className="overflow-x-auto rounded-lg bg-muted p-3 my-2">
+                                    <code className="text-sm font-mono">{children}</code>
+                                  </pre>
+                                )
+                              },
+                              ul: ({ children }) => <ul className="list-disc pl-5 my-2 space-y-1">{children}</ul>,
+                              ol: ({ children }) => <ol className="list-decimal pl-5 my-2 space-y-1">{children}</ol>,
+                              li: ({ children }) => <li className="text-sm">{children}</li>,
+                              h1: ({ children }) => <h1 className="text-lg font-bold mt-4 mb-2">{children}</h1>,
+                              h2: ({ children }) => <h2 className="text-base font-bold mt-3 mb-1.5">{children}</h2>,
+                              h3: ({ children }) => <h3 className="text-sm font-bold mt-2 mb-1">{children}</h3>,
+                              p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+                              table: ({ children }) => (
+                                <div className="overflow-x-auto my-2">
+                                  <table className="w-full text-sm border-collapse">{children}</table>
+                                </div>
+                              ),
+                              th: ({ children }) => <th className="border border-border px-3 py-1.5 bg-muted text-left font-medium">{children}</th>,
+                              td: ({ children }) => <td className="border border-border px-3 py-1.5">{children}</td>,
+                              hr: () => <hr className="my-3 border-border" />,
+                            }}
+                          >
+                            {message.content}
+                          </ReactMarkdown>
                         </div>
                       </div>
                     ) : (
@@ -159,12 +199,12 @@ export function ChatUI({ messages, onMessage, isGenerating, onStopGeneration }: 
                       {copiedMessageId === message.id ? (
                         <>
                           <Check className="w-3 h-3" />
-                          Copied
+                          {t.app.copied}
                         </>
                       ) : (
                         <>
                           <Copy className="w-3 h-3" />
-                          Copy
+                          {t.app.copy}
                         </>
                       )}
                     </button>
@@ -180,7 +220,7 @@ export function ChatUI({ messages, onMessage, isGenerating, onStopGeneration }: 
         <div className={`mx-auto max-w-2xl ${messages.length === 0 ? 'flex flex-col min-h-full pt-32 pb-8' : ''}`}>
           {messages.length === 0 && (
             <p className="font-instrument-sans font-medium text-foreground/90 text-4xl mb-6 text-center">
-              Hey there. I&apos;m your Transit Assistant.
+              {t.app.welcome}
             </p>
           )}
           <MessageBar onMessage={onMessage} isGenerating={isGenerating} onStopGeneration={onStopGeneration} />

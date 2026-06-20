@@ -164,6 +164,18 @@ func (s *Store) ValidateToken(token string) (string, UserType, error) {
 	return claims.UserID, claims.UserType, nil
 }
 
+func (s *Store) GetUserByEmail(email string) *User {
+	user := &User{}
+	err := s.db.QueryRow(
+		`SELECT id, email, name, type, hash, salt, created_at FROM users WHERE email = $1`,
+		email,
+	).Scan(&user.ID, &user.Email, &user.Name, &user.Type, &user.Hash, &user.Salt, &user.CreatedAt)
+	if err != nil {
+		return nil
+	}
+	return user
+}
+
 func (s *Store) GetUser(userID string) *User {
 	user := &User{}
 	err := s.db.QueryRow(

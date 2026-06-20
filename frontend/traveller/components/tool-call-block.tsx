@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react"
 import { Wrench, ChevronDown, ChevronRight, Loader2, AlertCircle, CheckCircle2 } from "lucide-react"
 import ShinyText from "@/components/shiny-text"
+import { useI18n } from "@/lib/i18n"
 
 interface ToolCallEvent {
   id: string
@@ -18,6 +19,7 @@ interface Props {
 }
 
 export function ToolCallBlock({ toolCall }: Props) {
+  const { t } = useI18n()
   const [isOpen, setIsOpen] = useState(false)
   const autoOpenedRef = useRef(false)
   const contentRef = useRef<HTMLDivElement>(null)
@@ -78,25 +80,25 @@ export function ToolCallBlock({ toolCall }: Props) {
         <Wrench className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0" />
         <div className="flex-1 truncate">
           {toolCall.status === "pending" ? (
-            <ShinyText text={`Using ${toolCall.name}`} />
+            <ShinyText text={`${t.chat.using} ${toolCall.name}`} />
           ) : (
-            <span className="font-medium text-sm text-muted-foreground/70 truncate">Used {toolCall.name}</span>
+            <span className="font-medium text-sm text-muted-foreground/70 truncate">{t.chat.used} {toolCall.name}</span>
           )}
         </div>
         {toolCall.status === "pending" ? (
           <span className="text-xs text-muted-foreground/60 flex items-center gap-1.5">
             <Loader2 className="w-3 h-3 animate-spin" />
-            Using&hellip;
+            {t.chat.using}
           </span>
         ) : toolCall.isError ? (
           <span className="text-xs text-destructive/80 flex items-center gap-1.5">
             <AlertCircle className="w-3 h-3" />
-            Failed
+            {t.chat.failed}
           </span>
         ) : (
           <span className="text-xs text-emerald-600/80 dark:text-emerald-400/80 flex items-center gap-1.5">
             <CheckCircle2 className="w-3 h-3" />
-            Done
+            {t.chat.done}
           </span>
         )}
         <span className="shrink-0 ml-1">
@@ -111,7 +113,7 @@ export function ToolCallBlock({ toolCall }: Props) {
       <div className={`overflow-hidden transition-all duration-300 ease-out ${isOpen ? "max-h-96 opacity-100" : "max-h-0 opacity-0"}`}>
         <div ref={contentRef} className="pr-4 py-3 space-y-2.5 overflow-y-auto max-h-80">
           <div>
-            <p className="text-[11px] text-muted-foreground/50 mb-1.5 font-medium uppercase tracking-wider">Input</p>
+            <p className="text-[11px] text-muted-foreground/50 mb-1.5 font-medium uppercase tracking-wider">{t.chat.input}</p>
             <div className="text-xs rounded-lg p-2.5 overflow-x-auto whitespace-pre-wrap break-all leading-relaxed bg-black/5 dark:bg-white/5">
               {args}
             </div>
@@ -120,7 +122,7 @@ export function ToolCallBlock({ toolCall }: Props) {
           {toolCall.result !== undefined && (
             <div>
               <p className="text-[11px] text-muted-foreground/50 mb-1.5 font-medium uppercase tracking-wider">
-                {toolCall.isError ? "Error" : "Output"}
+                {toolCall.isError ? t.chat.error : t.chat.output}
               </p>
               <div className={`text-xs rounded-lg p-2.5 overflow-x-auto whitespace-pre-wrap break-all leading-relaxed ${
                 toolCall.isError ? "bg-destructive/10 text-destructive/90" : "bg-black/5 dark:bg-white/5"

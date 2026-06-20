@@ -19,14 +19,14 @@ import (
 )
 
 func main() {
-	simSpeed := flag.Float64("sim-speed", 1.0, "simulator speed multiplier (0=disable)")
+	simSpeed := flag.Float64("sim-speed", 10.0, "simulator speed multiplier (0=disable)")
 	flag.Parse()
 
 	godotenv.Load()
 
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
-		dsn = "postgresql://postgres.fktowpepipmyrlxkvuez:Cy1jmvuviHJkrhAL@aws-1-ap-south-1.pooler.supabase.com:6543/postgres"
+		dsn = "postgresql://postgres:postgres@localhost:5432/agentrix?sslmode=disable"
 	}
 
 	db, err := auth.OpenDB(dsn)
@@ -56,6 +56,7 @@ func main() {
 	userAPIServer := userapi.NewServer(authStore, eng, g)
 
 	vehRegistry := registry.NewStore()
+	vehRegistry.SeedDemoData(authStore, g)
 	authServer.WithVehicleRegistrar(vehRegistry)
 	userAPIServer.WithRegistry(vehRegistry)
 

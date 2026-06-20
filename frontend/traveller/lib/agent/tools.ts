@@ -1,6 +1,61 @@
-import { getRoutes, getRouteStops, getRouteDetail } from "@/lib/api"
+import { getRoutes, getRouteStops } from "@/lib/api"
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080"
+const FETCH_TIMEOUT_MS = 10000
+const CACHE_TTL_MS = 5 * 60 * 1000
+
+interface StopsCacheEntry {
+  data: any[]
+  timestamp: number
+}
+
+function isNonEmptyString(v: unknown): v is string {
+  return typeof v === "string" && v.length > 0
+}
+
+let stopsCache: StopsCacheEntry | null = null
+
+async function getAllStops(): Promise<any[]> {
+  const now = Date.now()
+  if (stopsCache && now - stopsCache.timestamp < CACHE_TTL_MS) {
+    return stopsCache.data
+  }
+  const res = await getRoutes()
+  const allStops: any[] = []
+  for (const r of res.routes) {
+    try {
+      const detail = await getRouteStops(r.id)
+      for (const s of detail.stops) {
+        allStops.push({ ...s, route_id: r.id, route_name: r.name })
+      }
+    } catch {
+      /* skip route that fails */
+    }
+  }
+  stopsCache = { data: allStops, timestamp: now }
+  return allStops
+}
+
+async function apiFetch(path: string, token?: string): Promise<any> {
+  const headers: Record<string, string> = {}
+  if (token) headers["Authorization"] = `Bearer ${token}`
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+  try {
+    const res = await fetch(`${API_BASE}${path}`, { headers, signal: controller.signal })
+    clearTimeout(timeoutId)
+    if (!res.ok) {
+      return { error: `API responded with status ${res.status}` }
+    }
+    return res.json()
+  } catch (e) {
+    clearTimeout(timeoutId)
+    if (e instanceof Error && e.name === "AbortError") {
+      return { error: "Request timed out" }
+    }
+    return { error: "Network request failed" }
+  }
+}
 
 export interface ToolDefinition {
   name: string
@@ -18,29 +73,6 @@ export interface ToolResult {
   role: "tool"
   tool_call_id: string
   content: string
-}
-
-let stopsCache: any[] | null = null
-
-async function getAllStops(): Promise<any[]> {
-  if (stopsCache) return stopsCache
-  const res = await getRoutes()
-  const allStops: any[] = []
-  for (const r of res.routes) {
-    try {
-      const detail = await getRouteStops(r.id)
-      for (const s of detail.stops) {
-        allStops.push({ ...s, route_id: r.id, route_name: r.name })
-      }
-    } catch {}
-  }
-  stopsCache = allStops
-  return allStops
-}
-
-async function apiFetch(path: string): Promise<any> {
-  const res = await fetch(`${API_BASE}${path}`)
-  return res.json()
 }
 
 export const tools: ToolDefinition[] = [
@@ -157,21 +189,39 @@ export const tools: ToolDefinition[] = [
   },
 ]
 
-export async function executeToolCall(toolCall: ToolCall): Promise<ToolResult> {
+export async function executeToolCall(toolCall: ToolCall, token?: string): Promise<ToolResult> {
   const args = toolCall.arguments
   let content: string
 
   switch (toolCall.name) {
     case "resolve_stop": {
+      const query = isNonEmptyString(args.query) ? args.query.toLowerCase().trim() : ""
+      if (!query) {
+        content = JSON.stringify({ error: "Query is required" })
+        break
+      }
       try {
-        const query = (args.query as string).toLowerCase()
         const allStops = await getAllStops()
-        const matches = allStops.filter((s: any) =>
-          s.name.toLowerCase().includes(query) ||
-          s.id.toLowerCase().includes(query) ||
-          s.route_name?.toLowerCase().includes(query)
-        )
-        content = JSON.stringify(matches.length > 0 ? matches.slice(0, 10) : { error: "No stops found matching query" })
+        const scored = allStops
+          .filter((s: any) =>
+            s.name?.toLowerCase().includes(query) ||
+            s.id?.toLowerCase().includes(query) ||
+            s.route_name?.toLowerCase().includes(query)
+          )
+          .map((s: any) => {
+            const name = (s.name || "").toLowerCase()
+            const id = (s.id || "").toLowerCase()
+            let score = name.includes(query) ? 1 : 0
+            if (name.startsWith(query)) score += 10
+            if (name === query) score += 50
+            if (id.startsWith(query)) score += 5
+            if (s.route_name?.toLowerCase().includes(query)) score += 2
+            return { ...s, _score: score }
+          })
+          .sort((a: any, b: any) => b._score - a._score)
+          .slice(0, 10)
+
+        content = JSON.stringify(scored.length > 0 ? scored : { error: "No stops found matching query" })
       } catch (e) {
         content = JSON.stringify({ error: "Failed to search stops" })
       }
@@ -179,8 +229,12 @@ export async function executeToolCall(toolCall: ToolCall): Promise<ToolResult> {
     }
 
     case "get_eta": {
+      if (!isNonEmptyString(args.route_id) || !isNonEmptyString(args.stop_id)) {
+        content = JSON.stringify({ error: "route_id and stop_id are required" })
+        break
+      }
       try {
-        const data = await apiFetch(`/api/v1/eta?route_id=${args.route_id}&stop_id=${args.stop_id}`)
+        const data = await apiFetch(`/api/v1/eta?route_id=${encodeURIComponent(args.route_id)}&stop_id=${encodeURIComponent(args.stop_id)}`, token)
         content = JSON.stringify(data)
       } catch (e) {
         content = JSON.stringify({ error: "Failed to fetch ETA" })
@@ -190,8 +244,15 @@ export async function executeToolCall(toolCall: ToolCall): Promise<ToolResult> {
 
     case "get_fare":
     case "get_route": {
+      if (!isNonEmptyString(args.route_id) || !isNonEmptyString(args.from_stop_id) || !isNonEmptyString(args.to_stop_id)) {
+        content = JSON.stringify({ error: "route_id, from_stop_id, and to_stop_id are required" })
+        break
+      }
       try {
-        const data = await apiFetch(`/api/v1/eta/journey?route_id=${args.route_id}&from_stop=${args.from_stop_id}&to_stop=${args.to_stop_id}`)
+        const data = await apiFetch(
+          `/api/v1/eta/journey?route_id=${encodeURIComponent(args.route_id)}&from_stop=${encodeURIComponent(args.from_stop_id)}&to_stop=${encodeURIComponent(args.to_stop_id)}`,
+          token,
+        )
         content = JSON.stringify(data)
       } catch (e) {
         content = JSON.stringify({ error: "Failed to fetch route/fare info" })
@@ -201,24 +262,43 @@ export async function executeToolCall(toolCall: ToolCall): Promise<ToolResult> {
 
     case "get_service_alerts": {
       try {
-        const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
         const headers: Record<string, string> = {}
         if (token) headers["Authorization"] = `Bearer ${token}`
-
-        const res = await fetch(`${API_BASE}/api/v1/driver/advisories`, { headers })
-        const data = await res.json()
-        if (args.route_id && data.advisories) {
-          data.advisories = data.advisories.filter((a: any) => a.route_id === args.route_id)
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
+        const res = await fetch(`${API_BASE}/api/v1/driver/advisories`, { headers, signal: controller.signal })
+        clearTimeout(timeoutId)
+        if (!res.ok) {
+          content = JSON.stringify({ error: "No advisories available" })
+          break
         }
-        content = JSON.stringify(data.advisories || [])
+        const data = await res.json()
+        let advisories = data?.advisories || []
+        if (isNonEmptyString(args.route_id)) {
+          advisories = advisories.filter((a: any) => a.route_id === args.route_id)
+        }
+        content = JSON.stringify(advisories.length > 0 ? advisories : { info: "No active advisories for this route" })
       } catch (e) {
-        content = JSON.stringify([])
+        content = JSON.stringify({ error: "Failed to fetch advisories" })
       }
       break
     }
 
     case "present_plan": {
-      content = JSON.stringify(args)
+      const plan: Record<string, unknown> = {}
+      plan.from_stop = isNonEmptyString(args.from_stop) ? args.from_stop : "Unknown"
+      plan.to_stop = isNonEmptyString(args.to_stop) ? args.to_stop : "Unknown"
+      plan.route = isNonEmptyString(args.route) ? args.route : "Unknown"
+      plan.duration_minutes = typeof args.duration_minutes === "number" && args.duration_minutes > 0
+        ? Math.round(args.duration_minutes)
+        : 0
+      if (isNonEmptyString(args.fare)) plan.fare = args.fare
+      if (isNonEmptyString(args.depart_at)) plan.depart_at = args.depart_at
+      if (isNonEmptyString(args.arrive_at)) plan.arrive_at = args.arrive_at
+      if (Array.isArray(args.transfers)) plan.transfers = args.transfers
+      if (Array.isArray(args.steps)) plan.steps = args.steps
+      if (Array.isArray(args.alerts)) plan.alerts = args.alerts
+      content = JSON.stringify(plan)
       break
     }
 

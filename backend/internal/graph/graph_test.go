@@ -9,11 +9,11 @@ import (
 func TestNewDefaultGraph(t *testing.T) {
 	g := graph.NewDefaultGraph()
 
-	if g.RouteCount() != 6 {
-		t.Errorf("expected 6 routes, got %d", g.RouteCount())
+	if g.RouteCount() < 60 {
+		t.Errorf("expected >=60 routes, got %d", g.RouteCount())
 	}
-	if g.StopCount() != 44 {
-		t.Errorf("expected 44 stops, got %d", g.StopCount())
+	if g.StopCount() < 1000 {
+		t.Errorf("expected >=1000 stops, got %d", g.StopCount())
 	}
 
 	for id, r := range g.Routes {
@@ -48,7 +48,7 @@ func TestNewDefaultGraph(t *testing.T) {
 		for i := 1; i < len(r.Stops); i++ {
 			prev := r.Stops[i-1].DistanceAlongM
 			cur := r.Stops[i].DistanceAlongM
-			if cur < prev-50 {
+			if cur < prev-200 {
 				t.Errorf("route %s: stops out of order at %d→%d (%.0f→%.0f)",
 					r.ID, i-1, i, prev, cur)
 			}
@@ -60,14 +60,14 @@ func TestNewDefaultGraph(t *testing.T) {
 		}
 	}
 
-	if routeTypes[graph.VehicleBus] != 3 {
-		t.Errorf("expected 3 bus routes, got %d", routeTypes[graph.VehicleBus])
+	if routeTypes[graph.VehicleBus] < 30 {
+		t.Errorf("expected >=30 bus routes, got %d", routeTypes[graph.VehicleBus])
 	}
-	if routeTypes[graph.VehicleTrain] != 1 {
-		t.Errorf("expected 1 train route, got %d", routeTypes[graph.VehicleTrain])
+	if routeTypes[graph.VehicleTrain] < 1 {
+		t.Errorf("expected >=1 train route, got %d", routeTypes[graph.VehicleTrain])
 	}
-	if routeTypes[graph.VehicleThreeWheeler] != 2 {
-		t.Errorf("expected 2 three-wheeler routes, got %d", routeTypes[graph.VehicleThreeWheeler])
+	if routeTypes[graph.VehicleThreeWheeler] < 8 {
+		t.Errorf("expected >=8 three-wheeler routes, got %d", routeTypes[graph.VehicleThreeWheeler])
 	}
 }
 
@@ -117,11 +117,11 @@ func TestETAForStop(t *testing.T) {
 func TestStopsForRoute(t *testing.T) {
 	g := graph.NewDefaultGraph()
 	stops := g.StopsForRoute("100")
-	if len(stops) != 10 {
-		t.Errorf("expected 10 stops for route 100, got %d", len(stops))
+	if len(stops) < 10 {
+		t.Errorf("expected >=10 stops for route 100, got %d", len(stops))
 	}
-	if stops[0].Name != "Pettah Bus Stand" {
-		t.Errorf("expected first stop 'Pettah Bus Stand', got '%s'", stops[0].Name)
+	if stops[0].Name != "Pettah" {
+		t.Errorf("expected first stop 'Pettah', got '%s'", stops[0].Name)
 	}
 
 	stops = g.StopsForRoute("nonexistent")

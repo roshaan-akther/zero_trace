@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react"
 import { Brain, ChevronDown, ChevronRight } from "lucide-react"
 import ShinyText from "@/components/shiny-text"
+import { useI18n } from "@/lib/i18n"
 
 interface Props {
   thinking: string
@@ -10,6 +11,7 @@ interface Props {
 }
 
 export function ThinkingBlock({ thinking, isActive = false }: Props) {
+  const { t } = useI18n()
   const [isOpen, setIsOpen] = useState(false)
   const autoOpenedRef = useRef(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -40,9 +42,9 @@ export function ThinkingBlock({ thinking, isActive = false }: Props) {
         <Brain className="w-3.5 h-3.5 text-muted-foreground/60 shrink-0" />
         <div className="flex-1 truncate">
           {isActive ? (
-            <ShinyText text="Thinking" />
+            <ShinyText text={t.chat.thinking} />
           ) : (
-            <span className="font-medium text-sm text-muted-foreground/70 truncate">Thought</span>
+            <span className="font-medium text-sm text-muted-foreground/70 truncate">{t.chat.thought}</span>
           )}
         </div>
         <span className="shrink-0 ml-1">

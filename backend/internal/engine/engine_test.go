@@ -16,13 +16,28 @@ func newTestEngine() *engine.Engine {
 	return engine.New(graph.NewDefaultGraph())
 }
 
+var (
+	// Pettah — first stop on route 138
+	pettahLat  = 6.933211
+	pettahLng  = 79.855435
+	// Town Hall — 5th stop on route 138 (PID 27)
+	townHallLat  = 6.916799
+	townHallLng  = 79.863364
+	// Maharagama — 28th stop on route 138 (PID 53)
+	maharagamaLat  = 6.846083
+	maharagamaLng  = 79.928144
+	// Kottawa — 32nd stop on route 138 (PID 252)
+	kottawaLat = 6.841673
+	kottawaLng = 79.963989
+)
+
 func TestTelemetryValid(t *testing.T) {
 	e := newTestEngine()
 	resp, err := e.ProcessTelemetry(&engine.Telemetry{
 		VehicleID: "bus-138-01",
 		RouteID:   "138",
-		Lat:       6.9347,
-		Lng:       79.8513,
+		Lat:       pettahLat,
+		Lng:       pettahLng,
 		SpeedMPS:  9.0,
 		Timestamp: time.Now(),
 	})
@@ -48,8 +63,8 @@ func TestTelemetryOutlierSpeed(t *testing.T) {
 	_, err := e.ProcessTelemetry(&engine.Telemetry{
 		VehicleID: "bus-138-01",
 		RouteID:   "138",
-		Lat:       6.9347,
-		Lng:       79.8513,
+		Lat:       pettahLat,
+		Lng:       pettahLng,
 		SpeedMPS:  50.0,
 		Timestamp: time.Now(),
 	})
@@ -84,8 +99,8 @@ func TestTelemetryUnknownRoute(t *testing.T) {
 	_, err := e.ProcessTelemetry(&engine.Telemetry{
 		VehicleID: "bus-999-01",
 		RouteID:   "999",
-		Lat:       6.9347,
-		Lng:       79.8513,
+		Lat:       pettahLat,
+		Lng:       pettahLng,
 		SpeedMPS:  9.0,
 		Timestamp: time.Now(),
 	})
@@ -100,13 +115,13 @@ func TestETAComputation(t *testing.T) {
 	e.ProcessTelemetry(&engine.Telemetry{
 		VehicleID: "bus-138-01",
 		RouteID:   "138",
-		Lat:       6.9147,
-		Lng:       79.8776,
+		Lat:       townHallLat,
+		Lng:       townHallLng,
 		SpeedMPS:  9.0,
 		Timestamp: time.Now(),
 	})
 
-	results := e.GetETA("138", "138-07")
+	results := e.GetETA("138", "138-s28")
 	if results == nil {
 		t.Fatal("expected ETA results")
 	}
@@ -127,13 +142,13 @@ func TestETACompletedJourney(t *testing.T) {
 	e.ProcessTelemetry(&engine.Telemetry{
 		VehicleID: "bus-138-01",
 		RouteID:   "138",
-		Lat:       6.8384,
-		Lng:       79.9619,
+		Lat:       kottawaLat,
+		Lng:       kottawaLng,
 		SpeedMPS:  9.0,
 		Timestamp: time.Now(),
 	})
 
-	result := e.GetJourney("138", "138-01", "138-09")
+	result := e.GetJourney("138", "138-s1", "138-s28")
 	if result == nil {
 		t.Fatal("expected journey result")
 	}
@@ -148,8 +163,8 @@ func TestHeadway(t *testing.T) {
 	e.ProcessTelemetry(&engine.Telemetry{
 		VehicleID: "bus-138-01",
 		RouteID:   "138",
-		Lat:       6.9347,
-		Lng:       79.8513,
+		Lat:       pettahLat,
+		Lng:       pettahLng,
 		SpeedMPS:  9.0,
 		Timestamp: time.Now(),
 	})
@@ -157,8 +172,8 @@ func TestHeadway(t *testing.T) {
 	e.ProcessTelemetry(&engine.Telemetry{
 		VehicleID: "bus-138-02",
 		RouteID:   "138",
-		Lat:       6.9147,
-		Lng:       79.8776,
+		Lat:       townHallLat,
+		Lng:       townHallLng,
 		SpeedMPS:  8.5,
 		Timestamp: time.Now(),
 	})
@@ -178,7 +193,7 @@ func TestHeadway(t *testing.T) {
 func TestStateVectorCleanup(t *testing.T) {
 	sv := engine.NewStateVector()
 
-	sv.Update("bus-138-01", "138", 1000, 9.0, 0, 6.9347, 79.8513, 0.95, time.Now().Add(-10*time.Minute), 0)
+	sv.Update("bus-138-01", "138", 1000, 9.0, 0, pettahLat, pettahLng, 0.95, time.Now().Add(-10*time.Minute), 0)
 
 	sv.Cleanup(5 * time.Minute)
 
@@ -190,8 +205,8 @@ func TestStateVectorCleanup(t *testing.T) {
 func TestStateVectorUpdateChangesRoute(t *testing.T) {
 	sv := engine.NewStateVector()
 
-	sv.Update("bus-138-01", "138", 1000, 9.0, 0, 6.9347, 79.8513, 0.95, time.Now(), 0)
-	sv.Update("bus-138-01", "100", 2000, 8.0, 0, 6.9347, 79.8513, 0.95, time.Now(), 0)
+	sv.Update("bus-138-01", "138", 1000, 9.0, 0, pettahLat, pettahLng, 0.95, time.Now(), 0)
+	sv.Update("bus-138-01", "100", 2000, 8.0, 0, pettahLat, pettahLng, 0.95, time.Now(), 0)
 
 	byOldRoute := sv.GetByRoute("138")
 	if len(byOldRoute) != 0 {
@@ -210,21 +225,21 @@ func TestJourneyPlanning(t *testing.T) {
 	e.ProcessTelemetry(&engine.Telemetry{
 		VehicleID: "bus-138-01",
 		RouteID:   "138",
-		Lat:       6.9347,
-		Lng:       79.8513,
+		Lat:       pettahLat,
+		Lng:       pettahLng,
 		SpeedMPS:  9.0,
 		Timestamp: time.Now(),
 	})
 
-	result := e.GetJourney("138", "138-03", "138-07")
+	result := e.GetJourney("138", "138-s5", "138-s28")
 	if result == nil {
 		t.Fatal("expected journey result")
 	}
-	if result.FromStop.ID != "138-03" {
-		t.Errorf("expected from stop 138-03, got %s", result.FromStop.ID)
+	if result.FromStop.ID != "138-s5" {
+		t.Errorf("expected from stop 138-s5, got %s", result.FromStop.ID)
 	}
-	if result.ToStop.ID != "138-07" {
-		t.Errorf("expected to stop 138-07, got %s", result.ToStop.ID)
+	if result.ToStop.ID != "138-s28" {
+		t.Errorf("expected to stop 138-s28, got %s", result.ToStop.ID)
 	}
 	if result.DistanceKM <= 0 {
 		t.Errorf("expected positive distance, got %.2f", result.DistanceKM)
@@ -239,7 +254,7 @@ func TestJourneyPlanning(t *testing.T) {
 
 func TestJourneyInvalidStops(t *testing.T) {
 	e := newTestEngine()
-	result := e.GetJourney("138", "138-09", "138-01")
+	result := e.GetJourney("138", "138-s32", "138-s1")
 	if result != nil {
 		t.Error("expected nil for from_stop after to_stop")
 	}
@@ -251,7 +266,7 @@ func TestAPITelemetry(t *testing.T) {
 	ts := httptest.NewServer(srv)
 	defer ts.Close()
 
-	body := `{"vehicle_id":"bus-138-01","route_id":"138","lat":6.9347,"lng":79.8513,"speed_mps":9.0}`
+	body := `{"vehicle_id":"bus-138-01","route_id":"138","lat":6.933211,"lng":79.855435,"speed_mps":9.0}`
 	resp, err := http.Post(ts.URL+"/api/v1/telemetry", "application/json", strings.NewReader(body))
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
@@ -280,13 +295,13 @@ func TestAPIETA(t *testing.T) {
 	e.ProcessTelemetry(&engine.Telemetry{
 		VehicleID: "bus-138-01",
 		RouteID:   "138",
-		Lat:       6.9347,
-		Lng:       79.8513,
+		Lat:       pettahLat,
+		Lng:       pettahLng,
 		SpeedMPS:  9.0,
 		Timestamp: time.Now(),
 	})
 
-	resp, err := http.Get(ts.URL + "/api/v1/eta?route_id=138&stop_id=138-05")
+	resp, err := http.Get(ts.URL + "/api/v1/eta?route_id=138&stop_id=138-s28")
 	if err != nil {
 		t.Fatalf("request failed: %v", err)
 	}
@@ -326,8 +341,8 @@ func TestAPIRoutes(t *testing.T) {
 		t.Fatalf("decode failed: %v", err)
 	}
 	routes := result["routes"].([]interface{})
-	if len(routes) != 6 {
-		t.Errorf("expected 6 routes, got %d", len(routes))
+	if len(routes) < 60 {
+		t.Errorf("expected >=60 routes, got %d", len(routes))
 	}
 }
 
@@ -340,8 +355,8 @@ func TestAPIStatus(t *testing.T) {
 	e.ProcessTelemetry(&engine.Telemetry{
 		VehicleID: "test-vehicle",
 		RouteID:   "138",
-		Lat:       6.9347,
-		Lng:       79.8513,
+		Lat:       pettahLat,
+		Lng:       pettahLng,
 		SpeedMPS:  9.0,
 		Timestamp: time.Now(),
 	})

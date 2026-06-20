@@ -9,9 +9,11 @@ import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { signup, setToken, setUser } from "@/lib/api"
 import { Bus, Eye, EyeOff } from "lucide-react"
+import { useI18n } from "@/lib/i18n"
 
 export default function DriverSignupPage() {
   const router = useRouter()
+  const { t } = useI18n()
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
@@ -30,7 +32,7 @@ export default function DriverSignupPage() {
       setUser(res.user)
       router.push("/")
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Signup failed")
+      setError(err instanceof Error ? err.message : t.auth.signupFailed)
     } finally {
       setLoading(false)
     }
@@ -44,9 +46,9 @@ export default function DriverSignupPage() {
             <Bus className="w-6 h-6 text-primary" />
           </div>
         </div>
-        <CardTitle className="text-xl font-semibold tracking-tight">Register as driver</CardTitle>
+        <CardTitle className="text-xl font-semibold tracking-tight">{t.auth.createAccount}</CardTitle>
         <CardDescription className="text-sm text-muted-foreground">
-          Create your driver account
+          {t.auth.signUp}
         </CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit}>
@@ -57,11 +59,11 @@ export default function DriverSignupPage() {
             </div>
           )}
           <div className="space-y-2">
-            <Label htmlFor="name" className="text-sm font-medium">Full Name</Label>
+            <Label htmlFor="name" className="text-sm font-medium">{t.auth.fullName}</Label>
             <Input
               id="name"
               type="text"
-              placeholder="John Doe"
+              placeholder={t.auth.namePlaceholder}
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
@@ -69,11 +71,11 @@ export default function DriverSignupPage() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="email" className="text-sm font-medium">Email</Label>
+            <Label htmlFor="email" className="text-sm font-medium">{t.auth.email}</Label>
             <Input
               id="email"
               type="email"
-              placeholder="driver@transit.plus"
+              placeholder={t.auth.emailPlaceholder}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -81,12 +83,12 @@ export default function DriverSignupPage() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="password" className="text-sm font-medium">Password</Label>
+            <Label htmlFor="password" className="text-sm font-medium">{t.auth.password}</Label>
             <div className="relative">
               <Input
                 id="password"
                 type={showPassword ? "text" : "password"}
-                placeholder="At least 6 characters"
+                placeholder={t.auth.passwordMin}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -105,12 +107,12 @@ export default function DriverSignupPage() {
         </CardContent>
         <CardFooter className="flex flex-col gap-3 pt-2">
           <Button type="submit" disabled={loading} className="w-full h-10 rounded-xl">
-            {loading ? "Creating account..." : "Register"}
+            {loading ? t.auth.creatingAccount : t.auth.createAccountBtn}
           </Button>
           <p className="text-xs text-muted-foreground text-center">
-            Already have an account?{" "}
+            {t.auth.haveAccount}{" "}
             <Link href="/auth/login" className="text-primary font-medium hover:underline">
-              Sign in
+              {t.auth.signInLink}
             </Link>
           </p>
         </CardFooter>

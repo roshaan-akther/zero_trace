@@ -9,9 +9,11 @@ import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { login, setToken, setUser } from "@/lib/api"
 import { Bus, Eye, EyeOff } from "lucide-react"
+import { useI18n } from "@/lib/i18n"
 
 export default function DriverLoginPage() {
   const router = useRouter()
+  const { t } = useI18n()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
@@ -29,7 +31,7 @@ export default function DriverLoginPage() {
       setUser(res.user)
       router.push("/")
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed")
+      setError(err instanceof Error ? err.message : t.auth.loginFailed)
     } finally {
       setLoading(false)
     }
@@ -43,9 +45,9 @@ export default function DriverLoginPage() {
             <Bus className="w-6 h-6 text-primary" />
           </div>
         </div>
-        <CardTitle className="text-xl font-semibold tracking-tight">Driver sign in</CardTitle>
+        <CardTitle className="text-xl font-semibold tracking-tight">{t.auth.signIn}</CardTitle>
         <CardDescription className="text-sm text-muted-foreground">
-          Sign in to your driver account
+          {t.auth.signInTitle}
         </CardDescription>
       </CardHeader>
       <form onSubmit={handleSubmit}>
@@ -56,11 +58,11 @@ export default function DriverLoginPage() {
             </div>
           )}
           <div className="space-y-2">
-            <Label htmlFor="email" className="text-sm font-medium">Email</Label>
+            <Label htmlFor="email" className="text-sm font-medium">{t.auth.email}</Label>
             <Input
               id="email"
               type="email"
-              placeholder="driver@transit.plus"
+              placeholder={t.auth.emailPlaceholder}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -68,12 +70,12 @@ export default function DriverLoginPage() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="password" className="text-sm font-medium">Password</Label>
+            <Label htmlFor="password" className="text-sm font-medium">{t.auth.password}</Label>
             <div className="relative">
               <Input
                 id="password"
                 type={showPassword ? "text" : "password"}
-                placeholder="Enter your password"
+                placeholder={t.auth.passwordPlaceholder}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -91,12 +93,12 @@ export default function DriverLoginPage() {
         </CardContent>
         <CardFooter className="flex flex-col gap-3 pt-2">
           <Button type="submit" disabled={loading} className="w-full h-10 rounded-xl">
-            {loading ? "Signing in..." : "Sign in"}
+            {loading ? t.auth.signingIn : t.auth.signIn}
           </Button>
           <p className="text-xs text-muted-foreground text-center">
-            Don&apos;t have an account?{" "}
+            {t.auth.noAccount}{" "}
             <Link href="/auth/signup" className="text-primary font-medium hover:underline">
-              Register
+              {t.auth.createOne}
             </Link>
           </p>
         </CardFooter>

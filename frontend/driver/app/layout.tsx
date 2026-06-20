@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Google_Sans } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
 import { SidebarProvider } from "@/components/ui/sidebar";
+import { I18nProvider } from "@/lib/i18n";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
+const googleSans = Google_Sans({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
   title: "Driver Headway Advisory",
@@ -17,9 +18,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn("h-full", "antialiased", "font-sans", inter.variable)}>
+    <html lang="en" className={cn("h-full", "antialiased", "font-sans", googleSans.variable)}>
       <body className="min-h-full flex flex-col">
-        <SidebarProvider>{children}</SidebarProvider>
+        <SidebarProvider>
+          <I18nProvider>{children}</I18nProvider>
+        </SidebarProvider>
       </body>
     </html>
   );

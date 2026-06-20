@@ -2,6 +2,7 @@
 
 import { Train, Clock, DollarSign, ArrowRight, AlertTriangle, Info, AlertCircle, MapPin, Luggage } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { useI18n } from "@/lib/i18n"
 
 interface PlanStep {
   instruction: string
@@ -39,7 +40,27 @@ interface Props {
 
 function parsePlan(result: string): TravelPlan | null {
   try {
-    return JSON.parse(result) as TravelPlan
+    const raw = JSON.parse(result)
+    if (!raw || typeof raw !== "object") return null
+    const p = raw as Record<string, unknown>
+    if (
+      typeof p.from_stop !== "string" ||
+      typeof p.to_stop !== "string" ||
+      typeof p.route !== "string" ||
+      typeof p.duration_minutes !== "number"
+    ) return null
+    return {
+      from_stop: p.from_stop,
+      to_stop: p.to_stop,
+      route: p.route,
+      duration_minutes: p.duration_minutes,
+      fare: typeof p.fare === "string" ? p.fare : undefined,
+      depart_at: typeof p.depart_at === "string" ? p.depart_at : undefined,
+      arrive_at: typeof p.arrive_at === "string" ? p.arrive_at : undefined,
+      transfers: Array.isArray(p.transfers) ? p.transfers : undefined,
+      steps: Array.isArray(p.steps) ? p.steps : undefined,
+      alerts: Array.isArray(p.alerts) ? p.alerts : undefined,
+    }
   } catch {
     return null
   }
@@ -58,8 +79,15 @@ const severityColor = {
 }
 
 export function TravelPlanCard({ result }: Props) {
+  const { t } = useI18n()
   const plan = parsePlan(result)
-  if (!plan) return null
+  if (!plan) {
+    return (
+      <div className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">
+        {t.common.couldNotParse}
+      </div>
+    )
+  }
 
   return (
     <div className="rounded-xl border bg-card overflow-hidden mb-3">
@@ -90,7 +118,7 @@ export function TravelPlanCard({ result }: Props) {
       <div className="flex flex-wrap gap-2 px-4 py-3 border-b bg-card">
         <Badge variant="secondary" className="gap-1.5 text-xs py-1 px-2.5 rounded-lg">
           <Clock className="w-3 h-3" />
-          {plan.duration_minutes} min
+          {plan.duration_minutes} {t.timetable.minutes}
         </Badge>
         {plan.fare && (
           <Badge variant="secondary" className="gap-1.5 text-xs py-1 px-2.5 rounded-lg">
@@ -101,7 +129,7 @@ export function TravelPlanCard({ result }: Props) {
         {plan.transfers && plan.transfers.length > 0 && (
           <Badge variant="secondary" className="gap-1.5 text-xs py-1 px-2.5 rounded-lg">
             <Luggage className="w-3 h-3" />
-            {plan.transfers.length} transfer{plan.transfers.length > 1 ? "s" : ""}
+            {plan.transfers.length} {t.plan.transfers.toLowerCase()}
           </Badge>
         )}
         {plan.depart_at && plan.arrive_at && (
@@ -115,7 +143,7 @@ export function TravelPlanCard({ result }: Props) {
       {/* Step-by-step instructions */}
       {plan.steps && plan.steps.length > 0 && (
         <div className="px-4 py-3 border-b">
-          <p className="text-[11px] text-muted-foreground/50 uppercase tracking-wider font-medium mb-2.5">Journey Steps</p>
+          <p className="text-[11px] text-muted-foreground/50 uppercase tracking-wider font-medium mb-2.5">{t.plan.journeySteps}</p>
           <div className="space-y-2">
             {plan.steps.map((step, i) => (
               <div key={i} className="flex gap-3">
@@ -128,7 +156,7 @@ export function TravelPlanCard({ result }: Props) {
                 <div className="pb-2">
                   <p className="text-sm text-foreground/90">{step.instruction}</p>
                   {step.duration_min && (
-                    <p className="text-xs text-muted-foreground mt-0.5">{step.duration_min} min</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{step.duration_min} {t.timetable.minutes}</p>
                   )}
                 </div>
               </div>
@@ -140,12 +168,12 @@ export function TravelPlanCard({ result }: Props) {
       {/* Transfers */}
       {plan.transfers && plan.transfers.length > 0 && (
         <div className="px-4 py-3 border-b">
-          <p className="text-[11px] text-muted-foreground/50 uppercase tracking-wider font-medium mb-2.5">Transfers</p>
+          <p className="text-[11px] text-muted-foreground/50 uppercase tracking-wider font-medium mb-2.5">{t.plan.transfers}</p>
           <div className="space-y-1.5">
-            {plan.transfers.map((t, i) => (
+            {plan.transfers.map((tItem, i) => (
               <div key={i} className="flex items-center gap-2 text-sm text-muted-foreground">
                 <ArrowRight className="w-3 h-3 text-muted-foreground/50 shrink-0" />
-                <span className="text-xs">From <span className="font-medium text-foreground/80">{t.from}</span> to <span className="font-medium text-foreground/80">{t.to}</span> at <span className="font-medium text-foreground/80">{t.at}</span></span>
+                <span className="text-xs">From <span className="font-medium text-foreground/80">{tItem.from}</span> to <span className="font-medium text-foreground/80">{tItem.to}</span> at <span className="font-medium text-foreground/80">{tItem.at}</span></span>
               </div>
             ))}
           </div>
@@ -155,7 +183,7 @@ export function TravelPlanCard({ result }: Props) {
       {/* Service alerts */}
       {plan.alerts && plan.alerts.length > 0 && (
         <div className="px-4 py-3">
-          <p className="text-[11px] text-muted-foreground/50 uppercase tracking-wider font-medium mb-2.5">Service Alerts</p>
+          <p className="text-[11px] text-muted-foreground/50 uppercase tracking-wider font-medium mb-2.5">{t.plan.serviceAlerts}</p>
           <div className="space-y-2">
             {plan.alerts.map((alert, i) => {
               const Icon = severityIcon[alert.severity]

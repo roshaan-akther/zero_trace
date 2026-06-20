@@ -3,6 +3,7 @@ package registry
 import (
 	"fmt"
 	"math"
+	"strings"
 	"sync"
 
 	"github.com/agentrix/backend/internal/auth"
@@ -122,6 +123,44 @@ func (s *Store) ListAll() []*Vehicle {
 	return result
 }
 
+func (s *Store) SeedDemoData(authStore *auth.Store, g *graph.RouteGraph) {
+	count := 0
+	for routeID, route := range g.Routes {
+		email := "driver@demo.com"
+		name := "Demo Driver"
+		if count > 0 {
+			email = fmt.Sprintf("driver%d@demo.com", count)
+			name = fmt.Sprintf("Demo Driver %d", count+1)
+		}
+		user := authStore.GetUserByEmail(email)
+		if user == nil {
+			var err error
+			user, _, err = authStore.Signup(email, "demo123", name, auth.UserDriver)
+			if err != nil {
+				count++
+				continue
+			}
+		}
+		vtype := string(route.VehicleType)
+		if vtype == "" {
+			vtype = "bus"
+		}
+		plate := fmt.Sprintf("DEMO-%s", routeID)
+		vi, err := s.Register(plate, vtype, routeID)
+		if err != nil {
+			if !strings.Contains(err.Error(), "already registered") {
+				continue
+			}
+			vi = &auth.VehicleInfo{PlateNumber: plate}
+			_ = s.AssignDriver("veh-"+vi.PlateNumber, user.ID)
+		} else {
+			_ = s.AssignDriver("veh-"+vi.PlateNumber, user.ID)
+		}
+		count++
+	}
+	fmt.Printf("  Demo drivers: %d\n", count)
+}
+
 func (s *Store) Nearby(lat, lng float64, radiusKM float64, graph *graph.RouteGraph, eng *engine.Engine) []NearbyVehicle {
 	radiusM := radiusKM * 1000
 	states := eng.States().Snapshot()
@@ -146,6 +185,12 @@ func (s *Store) Nearby(lat, lng float64, radiusKM float64, graph *graph.RouteGra
 		}
 
 		v := s.byPlate[state.VehicleID]
+		if v == nil {
+			routes := s.byRoute[state.RouteID]
+			if len(routes) > 0 {
+				v = routes[0]
+			}
+		}
 		if v != nil {
 			nv.Vehicle = v
 			route := graph.GetRoute(v.RouteID)
@@ -163,7 +208,10 @@ func (s *Store) Nearby(lat, lng float64, radiusKM float64, graph *graph.RouteGra
 			route := graph.GetRoute(state.RouteID)
 			if route != nil && state.NextStopIdx < len(route.Stops) {
 				nv.NextStop = route.Stops[state.NextStopIdx].Name
-				nv.ETASeconds = route.ETAForStop(state.NextStopIdx, state.DistanceM, state.SpeedMPS)
+				eta := route.ETAForStop(state.NextStopIdx, state.DistanceM, state.SpeedMPS)
+				if !math.IsInf(eta, 0) && !math.IsNaN(eta) {
+					nv.ETASeconds = eta
+				}
 			}
 		}
 

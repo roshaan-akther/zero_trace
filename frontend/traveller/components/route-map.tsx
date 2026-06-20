@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react"
 import { MapContainer, TileLayer, Polyline, Marker, Popup } from "react-leaflet"
 import L from "leaflet"
 import "leaflet/dist/leaflet.css"
+import { useI18n } from "@/lib/i18n"
 
 interface LatLng {
   lat: number
@@ -47,6 +48,7 @@ const toIcon = L.divIcon({
 })
 
 export function RouteMap({ polyline, stops, fromStop, toStop, className = "" }: Props) {
+  const { t } = useI18n()
   const mapRef = useRef<L.Map>(null)
 
   const positions: [number, number][] = polyline.map(p => [p.lat, p.lng])
@@ -61,7 +63,7 @@ export function RouteMap({ polyline, stops, fromStop, toStop, className = "" }: 
   if (!polyline.length) {
     return (
       <div className={`flex items-center justify-center h-48 bg-muted/20 rounded-lg text-sm text-muted-foreground ${className}`}>
-        No route data available
+        {t.common.noRouteData}
       </div>
     )
   }

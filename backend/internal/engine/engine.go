@@ -166,6 +166,9 @@ func (e *Engine) GetETA(routeID, stopID string) []ETAEntry {
 			continue
 		}
 		eta := route.ETAForStop(stopIdx, v.DistanceM, v.SpeedMPS)
+		if math.IsInf(eta, 0) || math.IsNaN(eta) {
+			continue
+		}
 		result = append(result, ETAEntry{
 			VehicleID:  v.VehicleID,
 			DistanceM:  v.DistanceM,
@@ -269,9 +272,12 @@ func (e *Engine) GetHeadway(routeID string) []HeadwayEntry {
 	var result []HeadwayEntry
 	for i := 0; i < len(vehicles)-1; i++ {
 		gapM := vehicles[i+1].DistanceM - vehicles[i].DistanceM
-		gapS := math.Inf(1)
-		if vehicles[i].SpeedMPS >= 0.5 {
-			gapS = gapM / vehicles[i].SpeedMPS
+		if vehicles[i].SpeedMPS < 0.5 {
+			continue
+		}
+		gapS := gapM / vehicles[i].SpeedMPS
+		if math.IsInf(gapS, 0) || math.IsNaN(gapS) {
+			continue
 		}
 		result = append(result, HeadwayEntry{
 			VehicleID:       vehicles[i].VehicleID,
