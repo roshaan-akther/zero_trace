@@ -36,7 +36,7 @@ dist/
 *.o
 *.bin
 vendor/
-go.sum
+# go.sum is intentionally committed for Go modules
 
 # Go mod cache
 go/pkg/mod/
@@ -79,3 +79,6 @@ logs
 # Misc
 .cache/
 .tmp/
+
+# Dev Docs
+documentation/dev-docs
