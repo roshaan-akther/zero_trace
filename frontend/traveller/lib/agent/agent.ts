@@ -5,7 +5,7 @@ import { en } from "@/lib/translations/en"
 import { si } from "@/lib/translations/si"
 import { ta } from "@/lib/translations/ta"
 
-const MODEL = process.env.GROQ_MODEL || "qwen/qwen3-32b"
+const MODEL = process.env.GROQ_MODEL || "openai/gpt-oss-120b"
 const LLM_TIMEOUT_MS = 120000
 const TOOL_TIMEOUT_MS = 30000
 const MAX_ROUNDS = 10
@@ -17,10 +17,6 @@ const ENV_KEYS = (process.env.GROQ_API_KEYS || "")
   .filter(k => k.length > 0)
 
 const GROQ_KEYS = ENV_KEYS.length > 0 ? ENV_KEYS : [
-  "gsk_REDACTED",
-  "gsk_REDACTED",
-  "gsk_REDACTED",
-  "gsk_REDACTED",
   "gsk_REDACTED",
 ]
 
