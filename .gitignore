@@ -80,5 +80,10 @@ logs
 .cache/
 .tmp/
 
+# Large binaries / artifacts
+backend/engine
+backend/datagen
+agentrix-prevailstars_DemoVideo.webm
+
 # Dev Docs
 documentation/dev-docs
